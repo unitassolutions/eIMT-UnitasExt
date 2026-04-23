@@ -31,69 +31,84 @@ $sql = "SELECT * FROM app_ext_unitas_entity_buttons
         ORDER BY sort_order";
         
 $result = db_query($sql);
-$buttons_html = '';
+$buttons = [];
 
 while ($row = db_fetch_array($result)) {
-    // Get URL
-    $url = '';
-    if ($row['button_type'] == 'report' && $row['report_id']) {
-        $url = 'index.php?module=reports/view&reports_id=' . $row['report_id'];
-    } elseif ($row['external_url']) {
-        $url = $row['external_url'];
-    }
-    
-    // Build button HTML
-    $button_html = '<button type="button" class="btn btn-primary" ';
-    
-    if ($url) {
-        // Check if internal URL
-        $is_internal = (
-            strpos($url, 'index.php') === 0 || 
-            strpos($url, '?') === 0 || 
-            !preg_match('/^https?:\/\//', $url)
-        );
-        
-        if ($is_internal) {
-            // Format internal URL
-            if (strpos($url, '?') === 0) {
-                $url = 'index.php' . $url;
-            } elseif (!preg_match('/^https?:\/\//', $url) && !preg_match('/^index\.php/', $url)) {
-                $url = 'index.php?' . $url;
-            }
-            
-            // Check if it's a report URL
-            if (strpos($url, 'module=reports/view') !== false) {
-                // Add ALL parameters to hide sidebar, header, footer
-                $url .= '&is_modal=1&is_embed=1&is_print=1&hide_menu=1&hide_header=1&hide_footer=1&hide_sidebar=1&hide_toolbar=1&hide_breadcrumb=1';
-                
-                // Use clean report modal
-                $button_html .= 'onclick="unitasOpenCleanReport(\'' . addslashes($url) . '\', \'' . htmlspecialchars($row['button_title']) . '\')" ';
-            } else {
-                // Regular internal URL
-                $button_html .= 'onclick="open_dialog(\'' . addslashes($url) . '\')" ';
-            }
-        } else {
-            // External URL
-            $button_html .= 'onclick="window.open(\'' . addslashes($url) . '\', \'_blank\')" ';
+    $buttons[] = $row;
+}
+
+// Generate buttons HTML - EXACT match to "Add Project" button
+$buttons_html = '';
+
+if (count($buttons) > 0) {
+    foreach ($buttons as $index => $row) {
+        // Get URL
+        $url = '';
+        if ($row['button_type'] == 'report' && $row['report_id']) {
+            $url = 'index.php?module=reports/view&reports_id=' . $row['report_id'];
+        } elseif ($row['external_url']) {
+            $url = $row['external_url'];
         }
+        
+        // Format URL properly
+        if ($url) {
+            // Check if internal URL
+            $is_internal = (
+                strpos($url, 'index.php') === 0 || 
+                strpos($url, '?') === 0 || 
+                !preg_match('/^https?:\/\//', $url)
+            );
+            
+            if ($is_internal) {
+                // Format internal URL
+                if (strpos($url, '?') === 0) {
+                    $url = 'index.php' . $url;
+                } elseif (!preg_match('/^https?:\/\//', $url) && !preg_match('/^index\.php/', $url)) {
+                    $url = 'index.php?' . $url;
+                }
+                
+                // Check if it's a report URL
+                if (strpos($url, 'module=reports/view') !== false) {
+                    // Add ALL parameters to hide sidebar, header, footer
+                    $url .= '&is_modal=1&is_embed=1&is_print=1&hide_menu=1&hide_header=1&hide_footer=1&hide_sidebar=1&hide_toolbar=1&hide_breadcrumb=1';
+                }
+            }
+        }
+        
+        // Build onclick handler based on URL type
+        $onclick = '';
+        if ($url) {
+            if (strpos($url, 'module=reports/view') !== false && isset($row['report_id']) && $row['report_id']) {
+                // Report URL - use clean report modal
+                $onclick = 'onclick="unitasOpenCleanReport(\'' . addslashes($url) . '\', \'' . htmlspecialchars($row['button_title']) . '\'); return false;"';
+            } elseif (preg_match('/^https?:\/\//', $url)) {
+                // External URL - open in new tab
+                $onclick = 'onclick="window.open(\'' . addslashes($url) . '\', \'_blank\'); return false;"';
+            } else {
+                // Internal URL - use open_dialog
+                $onclick = 'onclick="open_dialog(\'' . addslashes($url) . '\'); return false;"';
+            }
+        }
+        
+        // Build button HTML - EXACT match to Add Project button structure
+        $button_html = '<button ' . $onclick . ' class="btn btn-primary" type="button">';
+        
+        // Add icon if specified
+        if (!empty($row['button_icon'])) {
+            $button_html .= '<i class="fa ' . $row['button_icon'] . '"></i> ';
+        }
+        
+        $button_html .= htmlspecialchars($row['button_title']) . '</button>';
+        
+        $buttons_html .= $button_html;
     }
-    
-    $button_html .= 'title="' . htmlspecialchars($row['button_title']) . '">';
-    
-    // Add icon if specified
-    if (!empty($row['button_icon'])) {
-        $button_html .= '<i class="fa ' . $row['button_icon'] . '"></i> ';
-    }
-    
-    $button_html .= htmlspecialchars($row['button_title']) . '</button>';
-    $buttons_html .= $button_html;
 }
 
 // Return JSON response
 echo json_encode([
     'success' => true,
     'entity_id' => $entity_id,
-    'button_count' => db_num_rows($result),
+    'button_count' => count($buttons),
     'buttons_html' => $buttons_html
 ]);
 

@@ -87,7 +87,9 @@ $cfg = unitas_map_config::get();
                 </div>
             </div>
 
-            <div class="form-actions right">
+            <hr style="margin: 15px 0;">
+
+            <div style="margin-left: 0;">
                 <button type="submit" class="btn btn-primary">
                     <?php echo TEXT_SAVE; ?>
                 </button>
