@@ -12,7 +12,9 @@ if(!$reports = db_fetch_array($reports_query))
 }
 ?>
 
+<?php if(!isset($_GET['is_modal'])): ?>
 <h3 class="page-title"><?php echo $reports['name'] ?></h3>
+<?php endif; ?>
 
 <?php
 

@@ -14,3 +14,11 @@
 * Implemented performance optimizations.
 * Introduced minor enhancements to improve overall system reliability and user experience.
 
+
+
+**Version 1.0.2**
+
+* Addressed identified bugs from the initial release.
+* Added HEIC/HEIF handler for uploads into eIMT
+* Addressed CSS related issues for Entity Buttons
+

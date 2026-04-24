@@ -1,0 +1,109 @@
+/**
+ * HEIC Converter Plugin — Styles
+ * 
+ * Minimal, non-intrusive overlay styling for the conversion indicator.
+ * Uses Rukovoditel's Bootstrap 3 color conventions where possible.
+ */
+
+/* ── Conversion Overlay ─────────────────────────────────────────────────── */
+
+.heic-conversion-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.90);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050; /* Above Bootstrap modals' backdrop (1040) */
+    border-radius: 4px;
+    min-height: 40px;
+}
+
+.heic-conversion-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #31708f; /* Bootstrap info text color */
+    background: #d9edf7; /* Bootstrap info background */
+    border: 1px solid #bce8f1;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Success State ───────────────────────────────────────────────────────── */
+
+.heic-conversion-overlay.heic-success .heic-conversion-content {
+    color: #3c763d;
+    background: #dff0d8;
+    border-color: #d6e9c6;
+}
+
+.heic-conversion-overlay.heic-success .fa-check-circle {
+    font-size: 16px;
+}
+
+/* ── Error State ─────────────────────────────────────────────────────────── */
+
+.heic-conversion-overlay.heic-error .heic-conversion-content {
+    color: #8a6d3b;
+    background: #fcf8e3;
+    border-color: #faebcc;
+}
+
+.heic-conversion-overlay.heic-error .fa-exclamation-triangle {
+    font-size: 16px;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+.heic-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #bce8f1;
+    border-top-color: #31708f;
+    border-radius: 50%;
+    animation: heic-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes heic-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Conversion text ─────────────────────────────────────────────────────── */
+
+.heic-conversion-text {
+    white-space: nowrap;
+}
+
+/* ── Page-level overlay (XHR interception feedback) ─────────────────────── */
+
+.heic-page-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.heic-page-overlay .heic-conversion-content {
+    padding: 16px 28px;
+    font-size: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.heic-page-overlay .heic-error {
+    color: #8a6d3b;
+    background: #fcf8e3;
+    border-color: #faebcc;
+}

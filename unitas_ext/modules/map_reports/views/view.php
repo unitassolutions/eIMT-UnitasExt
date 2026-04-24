@@ -3,7 +3,7 @@
 ?>
 
 <?php 
-	if(isset($_GET['path']))
+	if(isset($_GET['path']) && !isset($_GET['is_modal']))
 	{
 		$path_info = items::parse_path($_GET['path']);
 		$current_path = $_GET['path'];
@@ -18,7 +18,9 @@
 	}
 ?>
 
+<?php if(!isset($_GET['is_modal'])): ?>
 <h3 class="page-title"><?php echo $reports['name'] ?></h3>
+<?php endif; ?>
 
 <?php 
 $field_info = db_find('app_fields',$reports['fields_id']);

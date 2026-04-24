@@ -3,9 +3,6 @@
 require(component_path('unitas_ext/map_reports/menu'));
 require(component_path('unitas_ext/pivot_map_reports/menu'));
 
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 if($app_user['group_id'] == 0)
 {
     $app_plugin_menu['menu'][] = array(
@@ -33,6 +30,10 @@ if($app_user['group_id'] == 0)
                     array(
                         'title' => 'Google Map',
                         'url'   => url_for('unitas_ext/map_configuration/index')
+                    ),
+                    array(
+                        'title' => 'HEIC Converter',
+                        'url'   => url_for('unitas_ext/heic_converter/index')
                     )
                 )
             )

@@ -3,22 +3,21 @@
  * UNITAS Extension - Main Plugin File
  * @package Rukovoditel
  * @subpackage Plugin
- * @version 1.0.0
+ * @version 1.0.2
+ *
+ * FIX (v1.0.2): Moved all HTML injection from echo (which outputs before
+ * <!DOCTYPE html> and triggers browser quirks mode) into a single ob_start()
+ * callback that injects before </body>. This resolves body text sizing issues.
  */
 
-// Prevent direct access
-//if (!defined('IS_RUKOVODITEL')) {
-//    die('Direct access not permitted');
-//}
-
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.0.0');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.0.2');
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
 // Load main class
 require_once PLUGIN_UNITAS_EXT_PATH . '/classes/EntityButtons.php';
 
-// Check if this is an AJAX request to avoid outputting JavaScript
+// Check if this is an AJAX request — skip all injection for AJAX
 $is_ajax_request = (
     (isset($_POST['is_modal']) && $_POST['is_modal'] == 1) ||
     (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/entity_buttons/ajax_get_buttons')
@@ -27,121 +26,141 @@ $is_ajax_request = (
 if (!$is_ajax_request) {
     // Auto-install on first access
     PluginUnitasExtEntityButtons::install();
-    
-    // Get current module and path
+}
+
+// ── Build injection HTML ────────────────────────────────────────────────────
+// All HTML is collected here, then injected before </body> via ob_start().
+// NOTHING is echoed — this prevents pre-DOCTYPE content that breaks rendering.
+
+$unitas_inject_html = '';
+
+// Entity Buttons: JS + CSS on listing pages only
+if (!$is_ajax_request) {
     $current_module = $_GET['module'] ?? '';
     $current_path = $_GET['path'] ?? '';
-    
-    // Check if this is an entity listing page
+
     $is_entity_listing_page = false;
-    
+
     // Pattern 1: Standard entity listing (main or sub-entity)
     if ($current_module === 'items/items' && !empty($current_path)) {
         $is_entity_listing_page = true;
     }
-    
+
     // Pattern 2: Entity listing with specific action
     if (strpos($current_module, 'items/listing') === 0) {
         $is_entity_listing_page = true;
     }
-    
+
     // Pattern 3: Reports with entity context
     if ($current_module === 'reports/view' && isset($_GET['reports_id'])) {
         $is_entity_listing_page = true;
     }
-    
-    // Load JavaScript ONLY on entity listing pages
+
     if ($is_entity_listing_page) {
-        echo '<script src="plugins/unitas_ext/js/load-buttons.js" defer></script>';
-        
-        // Add CSS for modal styling
-        echo '<style>
-        /* Clean report modal - NO HEADER/SIDEBAR */
-        .unitas-clean-overlay {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            background: rgba(0,0,0,0.95) !important;
-            z-index: 99999 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
+        $unitas_inject_html .= "\n<!-- Unitas Extension: Entity Buttons -->\n" .
+            '<link rel="stylesheet" href="plugins/unitas_ext/css/unitas_ext.css">' . "\n" .
+            '<script src="plugins/unitas_ext/js/load-buttons.js" defer></script>' . "\n";
+    }
+}
+
+// HEIC Converter: JS + CSS on ALL pages for authenticated users
+if (isset($app_user['id']) && $app_user['id'] > 0) {
+    $unitas_inject_html .= "\n<!-- Unitas Extension: HEIC Converter -->\n" .
+        '<link rel="stylesheet" href="plugins/unitas_ext/css/heic_converter.css">' . "\n" .
+        '<script src="plugins/unitas_ext/js/heic/heic_converter.js"></script>' . "\n";
+}
+
+// Lightbox Embed Mode: Hide sidebar, header, footer when loaded inside a lightbox iframe.
+// This fires on the PAGE INSIDE THE IFRAME, not the parent page.
+if (isset($_GET['is_modal']) || isset($_GET['is_embed'])) {
+    $unitas_inject_html .= "\n<!-- Unitas Extension: Lightbox Embed Mode -->\n" .
+        '<style>
+        /* Hide all chrome: sidebar, header, footer, breadcrumbs, title, copyright, chat */
+        .page-sidebar-wrapper,
+        .page-sidebar,
+        .page-header,
+        .page-header-inner,
+        .page-footer,
+        .page-breadcrumb,
+        .page-bar,
+        .page-toolbar,
+        .page-title,
+        .footer,
+        .app-chat-button,
+        #sidebar,
+        .navbar,
+        .top-menu,
+        footer,
+        header { display: none !important; }
+
+        /* Expand content area — kill all spacing from hidden header */
+        .page-content-wrapper {
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: auto !important;
         }
 
-        .unitas-clean-modal {
-            background: #fff !important;
-            width: 99% !important;
-            height: 98% !important;
-            position: relative !important;
-            box-shadow: 0 15px 60px rgba(0,0,0,0.7) !important;
-            border-radius: 6px !important;
-            overflow: hidden !important;
-            border: 1px solid #444 !important;
+        .page-content {
+            margin: 0 !important;
+            padding: 0 8px 8px 0 !important;
+            min-height: auto !important;
         }
 
-        .unitas-clean-close {
-            position: absolute !important;
-            top: 20px !important;
-            right: 25px !important;
-            font-size: 42px !important;
-            line-height: 1 !important;
-            color: #fff !important;
-            cursor: pointer !important;
-            z-index: 1000 !important;
-            text-shadow: 0 3px 15px rgba(0,0,0,0.8) !important;
-            background: rgba(0,0,0,0.5) !important;
-            width: 55px !important;
-            height: 55px !important;
-            border-radius: 50% !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            transition: all 0.3s !important;
-            font-weight: 300 !important;
-            opacity: 0.9 !important;
-        }
-
-        .unitas-clean-close:hover {
-            background: rgba(0,0,0,0.8) !important;
-            transform: scale(1.15) !important;
-            opacity: 1 !important;
-        }
-
-        .unitas-clean-modal iframe {
-            width: 100% !important;
-            height: 100% !important;
-            border: none !important;
-            display: block !important;
-        }
-
-        /* Hide scrollbars when modal is open */
-        body.unitas-no-scroll {
-            overflow: hidden !important;
-            padding-right: 0 !important;
-        }
-
-        /* Hide elements inside iframe */
-        .unitas-clean-modal iframe body {
+        body {
             padding: 0 !important;
             margin: 0 !important;
             background: #fff !important;
+            overflow: hidden !important;
         }
 
-        /* UNITAS button styling */
-        .unitas-buttons {
-            display: inline-block !important;
-            margin-right: 10px !important;
-            vertical-align: middle !important;
+        /* Override .page-container 45px margin-top from style.css */
+        .page-header-fixed .page-container {
+            margin-top: 10px !important;
+            margin-left: 10px !important;
         }
 
-        .unitas-buttons button {
-            margin-right: 5px !important;
-            margin-bottom: 5px !important;
-            font-family: inherit !important;
-            font-size: inherit !important;
+        .page-header-fixed .page-content-wrapper,
+        .page-header-fixed .page-content {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
         }
-        </style>';
-    }
+
+        /* Map containers: 100vh - 10px top margin - 45px filter - 8px bottom pad - 12px buffer */
+        #goolge_map_container,
+        #map_container,
+        #openstreetmap_container,
+        #yandex_map_container,
+        .map-container {
+            height: calc(100vh - 75px) !important;
+            min-height: 400px !important;
+        }
+
+        /* Map with sidebar layout */
+        .table-sidebar {
+            height: calc(100vh - 75px) !important;
+        }
+        .table-sidebar .table-sidebar-content,
+        .table-sidebar .table-sidebar-body {
+            height: calc(100vh - 75px) !important;
+            vertical-align: top !important;
+        }
+        .map-sidebar-list-scroller {
+            max-height: calc(100vh - 105px) !important;
+            overflow-y: auto !important;
+        }
+        </style>' . "\n";
+}
+
+// ── Single output buffer for all injections ─────────────────────────────────
+// Injects collected HTML before </body>. Neutralizes </body> inside HTML
+// comments first so str_replace only matches the real closing tag.
+
+if (!empty($unitas_inject_html)) {
+    ob_start(function ($buffer) use ($unitas_inject_html) {
+        if (stripos($buffer, '</body>') !== false) {
+            $safe = preg_replace('/<!--(.*?)<\/body>(.*?)-->/si', '<!--$1&lt;/body&gt;$2-->', $buffer);
+            return str_replace('</body>', $unitas_inject_html . '</body>', $safe);
+        }
+        return $buffer;
+    });
 }

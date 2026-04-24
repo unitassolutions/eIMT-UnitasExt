@@ -67,25 +67,26 @@ if (count($buttons) > 0) {
                     $url = 'index.php?' . $url;
                 }
                 
-                // Check if it's a report URL
-                if (strpos($url, 'module=reports/view') !== false) {
-                    // Add ALL parameters to hide sidebar, header, footer
-                    $url .= '&is_modal=1&is_embed=1&is_print=1&hide_menu=1&hide_header=1&hide_footer=1&hide_sidebar=1&hide_toolbar=1&hide_breadcrumb=1';
+                // For report-type buttons, add parameters to hide sidebar/header/footer
+                // so the iframe lightbox shows clean content
+                if ($row['button_type'] == 'report') {
+                    $url .= (strpos($url, '?') !== false ? '&' : '?') .
+                        'is_modal=1&is_embed=1&is_print=1&hide_menu=1&hide_header=1&hide_footer=1&hide_sidebar=1&hide_toolbar=1&hide_breadcrumb=1';
                 }
             }
         }
         
-        // Build onclick handler based on URL type
+        // Build onclick handler based on button type
         $onclick = '';
         if ($url) {
-            if (strpos($url, 'module=reports/view') !== false && isset($row['report_id']) && $row['report_id']) {
-                // Report URL - use clean report modal
-                $onclick = 'onclick="unitasOpenCleanReport(\'' . addslashes($url) . '\', \'' . htmlspecialchars($row['button_title']) . '\'); return false;"';
+            if ($row['button_type'] == 'report') {
+                // Report button — always open in custom full-screen lightbox
+                $onclick = 'onclick="unitasOpenCleanReport(\'' . addslashes($url) . '\', \'' . htmlspecialchars($row['button_title'], ENT_QUOTES) . '\'); return false;"';
             } elseif (preg_match('/^https?:\/\//', $url)) {
-                // External URL - open in new tab
+                // External URL — open in new tab
                 $onclick = 'onclick="window.open(\'' . addslashes($url) . '\', \'_blank\'); return false;"';
             } else {
-                // Internal URL - use open_dialog
+                // Internal URL — use Rukovoditel's standard dialog
                 $onclick = 'onclick="open_dialog(\'' . addslashes($url) . '\'); return false;"';
             }
         }
