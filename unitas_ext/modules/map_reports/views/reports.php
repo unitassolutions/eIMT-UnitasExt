@@ -44,7 +44,7 @@ while($reports = db_fetch_array($reports_query)):
       $panels_id = filters_panels::get_id_by_type($reports['entities_id'], 'map_reports' . $reports['id']);
       
       echo '<br>&nbsp;&nbsp;<small>' . link_to(TEXT_FILTERS . ' (' . reports::count_filters_by_reports_type($reports['entities_id'], 'default_map_reports' . $reports['id']). ') ',url_for('default_filters/filters','reports_id=' . default_filters::get_reports_id($reports['entities_id'], 'default_map_reports' . $reports['id']) . '&redirect_to=public_map' . $reports['id']));
-      echo '<small>&nbsp;|&nbsp; <a href="' . url_for('ext/filters_panels/fields','panels_id=' . $panels_id . '&entities_id=' . $reports['entities_id'] . '&redirect_to=map_reports' . $reports['id']) . '">' . TEXT_QUICK_FILTERS_PANELS . '</a></small></small>';
+      echo '<small>&nbsp;|&nbsp; <a href="' . url_for('unitas_ext/filters_panels/fields','panels_id=' . $panels_id . '&entities_id=' . $reports['entities_id'] . '&redirect_to=map_reports' . $reports['id']) . '">' . TEXT_QUICK_FILTERS_PANELS . '</a></small></small>';
       
       if($reports['is_public_access'])
       {

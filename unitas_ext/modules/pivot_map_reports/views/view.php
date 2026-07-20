@@ -18,8 +18,10 @@ if(!$reports = db_fetch_array($reports_query))
 
 <?php
 
-echo pivot_map_reports::render_entity_filters_panel($reports);
-echo pivot_map_reports::render_legend($reports);
+require_once dirname(__DIR__,3) . '/classes/map/pivot_map_reports.php';
+
+echo unitas_pivot_map_reports::render_entity_filters_panel($reports);
+echo unitas_pivot_map_reports::render_legend($reports);
 
 // load correct map component
 $map_type = isset($reports['map_type']) ? $reports['map_type'] : 'google';  switch($map_type)

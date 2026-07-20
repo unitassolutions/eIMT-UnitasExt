@@ -11,22 +11,51 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.0.2');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.3.0');
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
-// Load main class
-require_once PLUGIN_UNITAS_EXT_PATH . '/classes/EntityButtons.php';
+// Load installer
+require_once PLUGIN_UNITAS_EXT_PATH . '/install.php';
+
+// Load custom field type (must be available before Rukovoditel tries to instantiate it)
+require_once PLUGIN_UNITAS_EXT_PATH . '/classes/fieldstypes/fieldtype_unitas_geometry.php';
 
 // Check if this is an AJAX request — skip all injection for AJAX
 $is_ajax_request = (
     (isset($_POST['is_modal']) && $_POST['is_modal'] == 1) ||
-    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/entity_buttons/ajax_get_buttons')
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/entity_buttons/ajax_get_buttons') ||
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/ajax_reverse_geocode') ||
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/public')
 );
 
-if (!$is_ajax_request) {
-    // Auto-install on first access
-    PluginUnitasExtEntityButtons::install();
+// ── Installation Check ──────────────────────────────────────────────────────
+// If plugin is not installed, redirect admin to the install page.
+// Non-admins see nothing — the plugin menu is hidden for them anyway.
+$current_module = $_GET['module'] ?? '';
+
+if (!unitas_ext_installer::is_installed() && !$is_ajax_request) {
+    // Only redirect when admin tries to access a unitas_ext page
+    if (strpos($current_module, 'unitas_ext/') === 0) {
+        // Allow access to the install page itself
+        if (strpos($current_module, 'unitas_ext/install') !== 0) {
+            if (isset($app_user['group_id']) && $app_user['group_id'] == 0) {
+                redirect_to('unitas_ext/install/index');
+            }
+        }
+    } else {
+        // Not a unitas_ext page and not installed — skip all plugin logic
+        return;
+    }
 }
+
+// ── Auto-Upgrade Check ──────────────────────────────────────────────────────
+// If installed but DB version is behind plugin version, run migrations silently.
+if (unitas_ext_installer::is_installed() && unitas_ext_installer::needs_upgrade() && !$is_ajax_request) {
+    unitas_ext_installer::upgrade();
+}
+
+// Load entity buttons class (tables are guaranteed to exist after install)
+require_once PLUGIN_UNITAS_EXT_PATH . '/classes/EntityButtons.php';
 
 // ── Build injection HTML ────────────────────────────────────────────────────
 // All HTML is collected here, then injected before </body> via ob_start().

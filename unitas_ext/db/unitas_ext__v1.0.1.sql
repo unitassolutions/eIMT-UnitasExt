@@ -126,7 +126,8 @@ CREATE TABLE `app_unitas_pivot_map_reports_entities` (
   `fields_in_popup` text NOT NULL,
   `fields_in_sidebar` text NOT NULL,
   `marker_color` varchar(16) NOT NULL,
-  `marker_icon` varchar(255) NOT NULL
+  `marker_icon` varchar(255) NOT NULL,
+  `legend_label` varchar(255) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

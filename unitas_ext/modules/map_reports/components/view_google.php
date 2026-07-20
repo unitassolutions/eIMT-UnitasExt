@@ -35,8 +35,15 @@ $google_maps_js = 'https://maps.googleapis.com/maps/api/js'
 <div id="map_rpeort_<?php echo $reports['id']; ?>"></div>
 
 <script>
+// Reload function called by filter panels when filter values change
+function load_map_report<?php echo $reports['id']; ?>()
+{
+    loadMapTheme(window._currentMapTheme || "<?php echo $map_cfg['default_theme'] ?: 'auto'; ?>");
+}
+
 function loadMapTheme(theme)
 {
+    window._currentMapTheme = theme;
     $("#map_rpeort_<?php echo $reports['id']; ?>").load(
         "<?php echo url_for('unitas_ext/map_reports/view_google&id=' . $reports['id']); ?>",
         {

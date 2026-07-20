@@ -48,6 +48,14 @@
       		</div>      
         </div>			
       </div> 
+      
+    <div class="form-group">
+    	<label class="col-md-4 control-label" for="legend_label">Legend Label</label>
+      <div class="col-md-8">	
+    	  <?php echo input_tag('legend_label',$obj['legend_label'],['class'=>'form-control input-xlarge']) ?>
+    	  <span class="help-block">This label will be displayed in the map legend when the legend is enabled for the report. If left blank, the entity name will be used.</span>
+      </div>			
+    </div> 
         	                
    </div>
 </div> 

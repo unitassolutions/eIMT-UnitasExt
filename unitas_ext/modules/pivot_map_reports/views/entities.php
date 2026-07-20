@@ -48,7 +48,7 @@ while($reports = db_fetch_array($reports_query)):
 
 $filters_panel_type = 'pivot_map_reports_entity_filters_panel_' . $pivot_map_info['id'] . '_' . $reports['entities_id'];
 $filters_panel_id = filters_panels::get_id_by_type($reports['entities_id'], $filters_panel_type);
-$filters_panel_link = '<a href="' . url_for('ext/filters_panels/fields','panels_id=' . $filters_panel_id . '&entities_id=' . $reports['entities_id'] . '&redirect_to=pivot_map_reports_entity' . $pivot_map_info['id'] . '_' . $reports['entities_id']) . '">' . TEXT_FILTERS_PANELS . '</a>';
+$filters_panel_link = '<a href="' . url_for('unitas_ext/filters_panels/fields','panels_id=' . $filters_panel_id . '&entities_id=' . $reports['entities_id'] . '&redirect_to=pivot_map_reports_entity' . $pivot_map_info['id'] . '_' . $reports['entities_id']) . '">' . TEXT_FILTERS_PANELS . '</a>';
     
     
 $reports_id = pivot_map_reports::get_reports_id_by_map_entity($reports['id'], $reports['entities_id']);

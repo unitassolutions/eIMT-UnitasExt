@@ -20,13 +20,19 @@ class unitas_map_config
         else
         {
             $cfg = [
-                'google_map_api_key' => '',
-                'map_style_light'    => '',
-                'map_style_dark'     => '',
-                'default_theme'      => 'auto',
-                'default_lat'        => '',
-                'default_lng'        => '',
-                'default_zoom'       => 8,
+                'google_map_api_key'   => '',
+                'map_style_light'      => '',
+                'map_style_dark'       => '',
+                'default_theme'        => 'auto',
+                'default_lat'          => '',
+                'default_lng'          => '',
+                'default_zoom'         => 8,
+                'waze_geocoding_token' => '',
+                'waze_region'          => 'na',
+                'waze_feed_enabled'    => 0,
+                'waze_feed_key'        => '',
+                'waze_feed_window'     => 15,
+                'waze_feed_config'     => '',
             ];
         }
 

@@ -25,8 +25,3 @@ if(!pivot_map_reports::has_access($reports['users_groups']))
 {
 	redirect_to('dashboard/access_forbidden');
 }
-
-// When opened in a lightbox iframe, use print layout (no sidebar/header)
-if (isset($_GET['is_modal']) || isset($_GET['is_embed']) || isset($_GET['is_print'])) {
-    $app_layout = 'print_layout.php';
-}

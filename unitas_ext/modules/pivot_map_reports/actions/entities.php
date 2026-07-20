@@ -31,6 +31,7 @@ switch($app_module_action)
             'background' => $_POST['background'],
             'marker_color' => $_POST['marker_color'],
             'marker_icon' => $_POST['marker_icon'],
+            'legend_label' => $_POST['legend_label']??'',
         );
 
         if(isset($_GET['id']))

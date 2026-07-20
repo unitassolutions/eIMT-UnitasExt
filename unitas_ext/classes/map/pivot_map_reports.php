@@ -482,14 +482,17 @@ class unitas_pivot_map_reports
         {
             $html .= '<ul class="list-inline">';
 
-            $items_query = db_query("select ce.*, e.name from app_unitas_pivot_map_reports_entities ce, app_entities e where (length(marker_color)>0 or length(marker_icon)>0) and e.id=ce.entities_id and ce.reports_id='" . $reports['id'] . "' order by e.name");
+            $items_query = db_query("select ce.*, e.name from app_unitas_pivot_map_reports_entities ce, app_entities e where (length(marker_color)>0 or length(marker_icon)>0) and e.id=ce.entities_id and ce.reports_id='" . $reports['id'] . "' order by ce.id");
             while($items = db_fetch_array($items_query))
             {
+                // Use legend_label if set, otherwise fall back to entity name
+                $label = (strlen(trim($items['legend_label'])) > 0) ? $items['legend_label'] : $items['name'];
+
                 if(strlen($items['marker_color']))
-                    $html .= '<li style="color: ' . $items['marker_color'] . '"><i class="fa fa-map-marker" aria-hidden="true"></i> ' . $items['name'] . '</li>';
+                    $html .= '<li style="color: ' . $items['marker_color'] . '"><i class="fa fa-map-marker" aria-hidden="true"></i> ' . htmlspecialchars($label) . '</li>';
 
                 if(strlen($items['marker_icon']))
-                    $html .= '<li><img src="' . $items['marker_icon'] . '"> ' . $items['name'] . '</li>';
+                    $html .= '<li><img src="' . $items['marker_icon'] . '"> ' . htmlspecialchars($label) . '</li>';
             }
 
             $html .= '</ul>';
@@ -549,10 +552,19 @@ class unitas_pivot_map_reports
     static function render_entity_filters_panel($reports)
     {
         $html = '';
+        $rendered_entities = array(); // Track rendered entities to avoid duplicates
         
         $report_entities_query = db_query("select * from app_unitas_pivot_map_reports_entities where reports_id={$reports['id']}");
         while($report_entities = db_fetch_array($report_entities_query))
         {
+            // Skip if we already rendered filters for this entity
+            // (same entity may appear multiple times with different marker styles)
+            if(in_array($report_entities['entities_id'], $rendered_entities))
+            {
+                continue;
+            }
+            $rendered_entities[] = $report_entities['entities_id'];
+
             $filters_panel_type = 'pivot_map_reports_entity_filters_panel_' . $reports['id'] . '_' . $report_entities['entities_id'];
             $filters_panel_id = filters_panels::get_id_by_type($report_entities['entities_id'], $filters_panel_type);
 
