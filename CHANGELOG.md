@@ -1,5 +1,38 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.4.0 (2026-07-17)
+
+### New Features
+- **Geometry fields on map reports** — Drawn closures now render on Unitas Map Reports and Pivot Map Reports. The Geometry (Google Map) field type is selectable as the map field, and each record draws its actual polyline, polygon, or circle on the map instead of being silently skipped.
+- **Shape plus marker** — Every shape also gets a marker at its representative point (polyline midpoint vertex, polygon centroid, circle center), so closures stay findable at county zoom and continue to work with marker clustering, the report sidebar, and map bounds fitting.
+- **Status color-coding** — Shape color follows the report Background Color field (e.g. Road Status choice colors), falling back to the geometry field Line Color, then red. Line weight comes from the field configuration.
+- **Mixed pivot layers** — A pivot map can now combine ordinary marker entities (shelters, resources) with geometry entities (road closures) on one map, each with its own color and legend label.
+
+### Bug Fixes
+- **Encoded polyline in popups** — Adding a geometry field to a report popup printed the raw encoded polyline, because popups request output with `is_export`. Popups now request the listing summary instead (e.g. "0.24 mi"). CSV and XML export still emit the encoded polyline.
+- **Geometry layers missing from the pivot map legend** — The legend query only included entities with a marker color or marker icon set, so a geometry layer (which needs neither) was filtered out. Geometry layers now always appear: they use the layer marker icon when one is set (matching the other icon legend items), otherwise a line swatch in the shape color. Only the swatch is colored — the label keeps the default legend text color.
+
+### Notes
+- Marker color is the fixed per-layer color and now also drives geometry shape color and the legend swatch; Background Color remains the per-record status color and takes precedence. Both fields gained help text explaining the precedence.
+
+### Files Changed
+| File | Change |
+|---|---|
+| `application_top.php` | Version 1.4.0 |
+| `classes/fieldstypes/fieldtype_unitas_geometry.php` | Added `parse_for_map()` and `render_map_shapes_js()` — shared geometry normalization and Google shape drawing |
+| `classes/map/map_reports.php` | Geometry branch in `get_coordinates()`, extracted `get_background_color()`, new `add_geometry()`, shapes in `render_google_js()`, popup fix |
+| `classes/map/pivot_map_reports.php` | Same as above (per-entity), plus `fieldtype_unitas_geometry` in `get_map_type()` |
+| `modules/map_reports/actions/reports.php` | Geometry added to the map field type filter |
+| `modules/map_reports/actions/view_google.php` | `shapes[]` array, shape-aware bounds fitting, empty-state guard |
+| `modules/map_reports/views/view.php` / `views/public.php` | Route geometry reports to the Google renderer |
+| `modules/pivot_map_reports/actions/entities.php` | Geometry added to the google and default field type filters |
+| `modules/pivot_map_reports/actions/view_google.php` | `shapes[]` array, shape-aware bounds fitting, empty-state guard |
+| `modules/pivot_map_reports/views/entities_form.php` | Geometry branch shows both Background Color and Marker Icon |
+| `modules/about/views/index.php` | Features + Release Notes for v1.4.0 |
+| `readme.md` | Release summary entry |
+
+---
+
 ## v1.3.0 (2026-07-17)
 
 ### New Features

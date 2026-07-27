@@ -4,6 +4,7 @@ class unitas_pivot_map_reports
 {
 
     public $markers;
+    public $shapes;
     private $polyline;
     private $polygon;
     private $reports_id;
@@ -24,6 +25,7 @@ class unitas_pivot_map_reports
     {
         $this->reports_id = $reports['id'];
         $this->markers = array();
+        $this->shapes = array();
         $this->polyline = array();
         $this->polygon = array();
         $this->latlng = false;
@@ -108,6 +110,16 @@ class unitas_pivot_map_reports
             $items_query = db_query($listing_sql);
             while($items = db_fetch_array($items_query))
             {
+                // Geometry fields hold one JSON object per record. The value
+                // normalization below (semicolon split, comma-space squeeze,
+                // parenthesis truncation) is mapbbcode-specific and
+                // would corrupt it, so this type reads the raw column value.
+                if($this->field_info['type'] === 'fieldtype_unitas_geometry')
+                {
+                    $this->add_geometry($items, $map_entities);
+                    continue;
+                }
+
                 foreach(explode(';', $items['field_' . $this->fields_id]) as $obj_count => $value)
                 {
                     //prepare value
@@ -119,34 +131,8 @@ class unitas_pivot_map_reports
                         $value = $value[0];
                     }
 
-                    $color = (strlen($this->marker_color) ? $this->marker_color : '');
-
                     //get color
-                    if($this->background)
-                    {
-                        if(strlen($items['field_' . $this->background]))
-                        {
-                            if(isset($app_fields_cache[$this->entities_id][$this->background]))
-                            {
-                                $cfg = new fields_types_cfg($app_fields_cache[$this->entities_id][$this->background]['configuration']);
-
-                                if($cfg->get('use_global_list') > 0)
-                                {
-                                    if(isset($app_global_choices_cache[$items['field_' . $this->background]]['bg_color']))
-                                    {
-                                        $color = $app_global_choices_cache[$items['field_' . $this->background]]['bg_color'];
-                                    }
-                                }
-                                else
-                                {
-                                    if(isset($app_choices_cache[$items['field_' . $this->background]]['bg_color']))
-                                    {
-                                        $color = $app_choices_cache[$items['field_' . $this->background]]['bg_color'];
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    $color = $this->get_background_color($items);
 
                     switch($this->field_info['type'])
                     {
@@ -253,6 +239,121 @@ class unitas_pivot_map_reports
         //echo '</pre>';
     }
 
+    /**
+     * Resolve a record color: the per-entity marker color, overridden by
+     * the background field choice color when configured. Extracted from
+     * get_coordinates() so the geometry path reuses it.
+     */
+    function get_background_color($items)
+    {
+        global $app_choices_cache, $app_fields_cache, $app_global_choices_cache;
+
+        $color = (strlen($this->marker_color) ? $this->marker_color : '');
+
+        if($this->background)
+        {
+            if(strlen($items['field_' . $this->background]))
+            {
+                if(isset($app_fields_cache[$this->entities_id][$this->background]))
+                {
+                    $cfg = new fields_types_cfg($app_fields_cache[$this->entities_id][$this->background]['configuration']);
+
+                    if($cfg->get('use_global_list') > 0)
+                    {
+                        if(isset($app_global_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        {
+                            $color = $app_global_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                        }
+                    }
+                    else
+                    {
+                        if(isset($app_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        {
+                            $color = $app_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $color;
+    }
+
+    /**
+     * Turn a fieldtype_unitas_geometry value into a drawable shape plus a
+     * companion marker at its representative point. The marker keeps
+     * clustering, the sidebar, bounds fitting and the empty-state guard
+     * working exactly as they do for ordinary point fields.
+     */
+    function add_geometry($items, $map_entities)
+    {
+        $shape = fieldtype_unitas_geometry::parse_for_map($items['field_' . $this->fields_id]);
+
+        if(!$shape)
+        {
+            return;
+        }
+
+        $cfg = new fields_types_cfg($this->field_info['configuration']);
+
+        // Status color first, then the field default, then red
+        $color = $this->get_background_color($items);
+        if(!strlen($color)) $color = $cfg->get('stroke_color');
+        if(!strlen($color)) $color = '#FF0000';
+
+        $weight = (int)$cfg->get('stroke_weight');
+        if($weight < 1) $weight = 4;
+
+        $id    = $items['id'] . '_' . $map_entities['id'];
+        $popup = $this->get_popup($items);
+
+        $this->shapes[] = array(
+            'id'       => $id,
+            'kind'     => $shape['kind'],
+            'points'   => $shape['points'],
+            'center'   => $shape['center'],
+            'radius_m' => $shape['radius_m'],
+            'color'    => $color,
+            'weight'   => $weight,
+            'popup'    => $popup,
+        );
+
+        $this->markers[] = array(
+            'id'    => $id,
+            'lat'   => $shape['lat'],
+            'lng'   => $shape['lng'],
+            'color' => $color,
+            'icon'  => $this->marker_icon,
+            'popup' => $popup,
+        );
+
+        if(!$this->latlng)
+        {
+            $this->latlng = $shape['lat'] . ',' . $shape['lng'];
+        }
+
+        if($this->display_sidebar)
+        {
+            $text_pattern = new fieldtype_text_pattern;
+
+            if(strlen($map_entities['fields_in_sidebar']))
+            {
+                $name = $text_pattern->output_singe_text($map_entities['fields_in_sidebar'], $this->entities_id, $items);
+            }
+            else
+            {
+                $name = items::get_heading_field($this->entities_id, $items['id'], $items);
+            }
+
+            $this->sidebar[$this->entities_id][] = [
+                'lat'   => $shape['lat'],
+                'lng'   => $shape['lng'],
+                'color' => $color,
+                'name'  => $name,
+            ];
+        }
+    }
+
     function set_latlng($value)
     {
         if(!$this->latlng)
@@ -311,6 +412,14 @@ class unitas_pivot_map_reports
                         'is_export' => true,
                         'is_print' => true,
                         'path' => $field['entities_id']);
+
+                    // Geometry returns the encoded polyline for is_export —
+                    // popups want the human summary (e.g. 0.24 mi) instead.
+                    if($field['type'] === 'fieldtype_unitas_geometry')
+                    {
+                        unset($output_options['is_export'], $output_options['is_print']);
+                        $output_options['is_listing'] = true;
+                    }
 
                     $value = trim(fields_types::output($output_options));
 
@@ -389,6 +498,8 @@ class unitas_pivot_map_reports
 				';
         }
 
+        $html .= fieldtype_unitas_geometry::render_map_shapes_js($this->shapes);
+
         return $html;
     }
 
@@ -461,6 +572,7 @@ class unitas_pivot_map_reports
                     break;
                 case 'fieldtype_google_map':
                 case 'fieldtype_google_map_directions':
+                case 'fieldtype_unitas_geometry':
                     return "google";
                     break;
                 case 'fieldtype_mapbbcode':
@@ -482,11 +594,41 @@ class unitas_pivot_map_reports
         {
             $html .= '<ul class="list-inline">';
 
-            $items_query = db_query("select ce.*, e.name from app_unitas_pivot_map_reports_entities ce, app_entities e where (length(marker_color)>0 or length(marker_icon)>0) and e.id=ce.entities_id and ce.reports_id='" . $reports['id'] . "' order by ce.id");
+            // Geometry layers are included even without a marker color or icon:
+            // they draw shapes, so their legend swatch comes from the shape color.
+            $items_query = db_query("select ce.*, e.name, f.type as field_type, f.configuration as field_configuration from app_unitas_pivot_map_reports_entities ce inner join app_entities e on e.id=ce.entities_id left join app_fields f on f.id=ce.fields_id where ce.reports_id='" . $reports['id'] . "' and (length(ce.marker_color)>0 or length(ce.marker_icon)>0 or f.type='fieldtype_unitas_geometry') order by ce.id");
             while($items = db_fetch_array($items_query))
             {
                 // Use legend_label if set, otherwise fall back to entity name
                 $label = (strlen(trim($items['legend_label'])) > 0) ? $items['legend_label'] : $items['name'];
+
+                // Geometry layers use the marker icon when one is set, so they
+                // match the other icon legend items. Without an icon they fall
+                // back to a line swatch in the shape color. Only the swatch is
+                // colored - the label keeps the default legend text color.
+                if($items['field_type'] === 'fieldtype_unitas_geometry')
+                {
+                    if(strlen($items['marker_icon']))
+                    {
+                        $html .= '<li><img src="' . $items['marker_icon'] . '"> ' . htmlspecialchars($label) . '</li>';
+                    }
+                    else
+                    {
+                        $legend_color = $items['marker_color'];
+
+                        if(!strlen($legend_color))
+                        {
+                            $geo_cfg = new fields_types_cfg($items['field_configuration']);
+                            $legend_color = $geo_cfg->get('stroke_color');
+                        }
+
+                        if(!strlen($legend_color)) $legend_color = '#FF0000';
+
+                        $html .= '<li><i class="fa fa-minus" aria-hidden="true" style="color: ' . $legend_color . '; font-weight: bold;"></i> ' . htmlspecialchars($label) . '</li>';
+                    }
+
+                    continue;
+                }
 
                 if(strlen($items['marker_color']))
                     $html .= '<li style="color: ' . $items['marker_color'] . '"><i class="fa fa-map-marker" aria-hidden="true"></i> ' . htmlspecialchars($label) . '</li>';

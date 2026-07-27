@@ -104,13 +104,13 @@ switch($app_module_action)
                 $use_field_type = "'fieldtype_yandex_map'";
                 break;
             case 'google':
-                $use_field_type = "'fieldtype_google_map','fieldtype_google_map_directions'";
+                $use_field_type = "'fieldtype_google_map','fieldtype_google_map_directions','fieldtype_unitas_geometry'";
                 break;
             case 'mapbbcode':
                 $use_field_type = "'fieldtype_mapbbcode'";
                 break;
             default:
-                $use_field_type = "'fieldtype_mapbbcode','fieldtype_google_map','fieldtype_google_map_directions','fieldtype_yandex_map'";
+                $use_field_type = "'fieldtype_mapbbcode','fieldtype_google_map','fieldtype_google_map_directions','fieldtype_yandex_map','fieldtype_unitas_geometry'";
                 break;
         }
 
@@ -180,7 +180,8 @@ switch($app_module_action)
          <div class="form-group from-group-background">
           	<label class="col-md-4 control-label" for="allowed_groups">' . tooltip_icon(TEXT_EXT_MAP_REPORTS_BACKGROUND_COLOR_INFO) . TEXT_BACKGROUND_COLOR . '</label>
             <div class="col-md-8">
-          	   ' . select_tag('background', $choices, $obj['background'], array('class' => 'form-control input-large')) . '               
+          	   ' . select_tag('background', $choices, $obj['background'], array('class' => 'form-control input-large')) . '
+               ' . tooltip_text('Optional. Colors each record by the choice color of the selected status field. Leave blank to use one fixed color for the whole layer and set that color in Marker color below.') . '
             </div>
           </div>
         ';

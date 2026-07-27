@@ -18,6 +18,7 @@ class map_reports
     private $fiters_reports_id;
     private $fields_id;
     public $markers;
+    public $shapes;
     private $polyline;
     private $polygon;
     private $fields_in_popup;
@@ -40,6 +41,7 @@ class map_reports
         $this->fiters_reports_id = $fiters_reports_id;
         $this->is_public_access = $reports['is_public_access'];
         $this->markers = array();
+        $this->shapes = array();
         $this->polyline = array();
         $this->polygon = array();
         $this->latlng = false;
@@ -111,6 +113,16 @@ class map_reports
         $items_query = db_query($listing_sql);
         while ($items = db_fetch_array($items_query))
         {
+            // Geometry fields hold one JSON object per record. The value
+            // normalization below (semicolon split, comma-space squeeze,
+            // parenthesis truncation) is mapbbcode-specific and
+            // would corrupt it, so this type reads the raw column value.
+            if ($this->field_info['type'] === 'fieldtype_unitas_geometry')
+            {
+                $this->add_geometry($items);
+                continue;
+            }
+
             foreach (explode(';', $items['field_' . $this->fields_id]) as $obj_count=>$value)
             {
                 //prepare value
@@ -122,34 +134,8 @@ class map_reports
                     $value = $value[0];
                 }
 
-                $color = '';
-
                 //get color
-                if ($this->background)
-                {
-                    if (strlen($items['field_' . $this->background]))
-                    {
-                        if (isset($app_fields_cache[$this->entities_id][$this->background]))
-                        {
-                            $cfg = new fields_types_cfg($app_fields_cache[$this->entities_id][$this->background]['configuration']);
-
-                            if ($cfg->get('use_global_list') > 0)
-                            {
-                                if (isset($app_global_choices_cache[$items['field_' . $this->background]]['bg_color']))
-                                {
-                                    $color = $app_global_choices_cache[$items['field_' . $this->background]]['bg_color'];
-                                }
-                            }
-                            else
-                            {
-                                if (isset($app_choices_cache[$items['field_' . $this->background]]['bg_color']))
-                                {
-                                    $color = $app_choices_cache[$items['field_' . $this->background]]['bg_color'];
-                                }
-                            }
-                        }
-                    }
-                }
+                $color = $this->get_background_color($items);
 
                 switch ($this->field_info['type'])
                 {
@@ -257,6 +243,118 @@ class map_reports
         //echo '</pre>';
     }
 
+    /**
+     * Resolve a record color from the report background field.
+     * Extracted from get_coordinates() so the geometry path reuses it.
+     */
+    function get_background_color($items)
+    {
+        global $app_choices_cache, $app_fields_cache, $app_global_choices_cache;
+
+        $color = '';
+
+        if ($this->background)
+        {
+            if (strlen($items['field_' . $this->background]))
+            {
+                if (isset($app_fields_cache[$this->entities_id][$this->background]))
+                {
+                    $cfg = new fields_types_cfg($app_fields_cache[$this->entities_id][$this->background]['configuration']);
+
+                    if ($cfg->get('use_global_list') > 0)
+                    {
+                        if (isset($app_global_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        {
+                            $color = $app_global_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                        }
+                    }
+                    else
+                    {
+                        if (isset($app_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        {
+                            $color = $app_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $color;
+    }
+
+    /**
+     * Turn a fieldtype_unitas_geometry value into a drawable shape plus a
+     * companion marker at its representative point. The marker keeps
+     * clustering, the sidebar, bounds fitting and the empty-state guard
+     * working exactly as they do for ordinary point fields.
+     */
+    function add_geometry($items)
+    {
+        $shape = fieldtype_unitas_geometry::parse_for_map($items['field_' . $this->fields_id]);
+
+        if (!$shape)
+        {
+            return;
+        }
+
+        $cfg = new fields_types_cfg($this->field_info['configuration']);
+
+        // Status color first, then the field default, then red
+        $color = $this->get_background_color($items);
+        if (!strlen($color)) $color = $cfg->get('stroke_color');
+        if (!strlen($color)) $color = '#FF0000';
+
+        $weight = (int)$cfg->get('stroke_weight');
+        if ($weight < 1) $weight = 4;
+
+        $popup = $this->get_popup($items);
+
+        $this->shapes[] = array(
+            'id'       => $items['id'],
+            'kind'     => $shape['kind'],
+            'points'   => $shape['points'],
+            'center'   => $shape['center'],
+            'radius_m' => $shape['radius_m'],
+            'color'    => $color,
+            'weight'   => $weight,
+            'popup'    => $popup,
+        );
+
+        $this->markers[] = array(
+            'id'    => $items['id'],
+            'lat'   => $shape['lat'],
+            'lng'   => $shape['lng'],
+            'color' => $color,
+            'popup' => $popup,
+        );
+
+        if (!$this->latlng)
+        {
+            $this->latlng = $shape['lat'] . ',' . $shape['lng'];
+        }
+
+        if ($this->display_sidebar)
+        {
+            $text_pattern = new fieldtype_text_pattern;
+
+            if (strlen($this->fields_in_sidebar))
+            {
+                $name = $text_pattern->output_singe_text($this->fields_in_sidebar, $this->entities_id, $items);
+            }
+            else
+            {
+                $name = items::get_heading_field($this->entities_id, $items['id'], $items);
+            }
+
+            $this->sidebar[$this->entities_id][] = [
+                'lat'   => $shape['lat'],
+                'lng'   => $shape['lng'],
+                'color' => $color,
+                'name'  => $name,
+            ];
+        }
+    }
+
     function set_latlng($value)
     {
         if (!$this->latlng)
@@ -325,6 +423,14 @@ class map_reports
                         'is_print' => true,
                         'path' => $field['entities_id']);
 
+                    // Geometry returns the encoded polyline for is_export —
+                    // popups want the human summary (e.g. 0.24 mi) instead.
+                    if ($field['type'] === 'fieldtype_unitas_geometry')
+                    {
+                        unset($output_options['is_export'], $output_options['is_print']);
+                        $output_options['is_listing'] = true;
+                    }
+
                     $value = trim(fields_types::output($output_options));
 
                     if (strlen(strip_tags($value)) > 255 and in_array($field['type'], ['fieldtype_textarea_wysiwyg', 'fieldtype_textarea']))
@@ -392,11 +498,18 @@ class map_reports
 	          infowindow.close();//hide the infowindow
 	          infowindow.setContent(\'<div id="content">' . str_replace(array("\n", "\r", "\n\r"), ' ', nl2br(urldecode($v['popup']))) . '</div>\');
 	          infowindow.open(map,marker' . $v['id'] . ');
-	        });	
+	        });
 				';
         }
 
+        $html .= $this->render_google_shapes_js();
+
         return $html;
+    }
+
+    function render_google_shapes_js()
+    {
+        return fieldtype_unitas_geometry::render_map_shapes_js($this->shapes);
     }
 
     function render_js()

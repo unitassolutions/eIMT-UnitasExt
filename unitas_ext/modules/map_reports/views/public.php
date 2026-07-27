@@ -2,7 +2,7 @@
 
 $field_info = db_find('app_fields', $reports['fields_id']);
 
-if (in_array($field_info['type'], ['fieldtype_google_map', 'fieldtype_google_map_directions']))
+if (in_array($field_info['type'], ['fieldtype_google_map', 'fieldtype_google_map_directions', 'fieldtype_unitas_geometry']))
 {
     require(component_path('unitas_ext/map_reports/view_google'));
 }

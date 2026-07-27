@@ -62,7 +62,7 @@
                     </tr>
                     <tr>
                         <td><strong>Geometry Field Type</strong></td>
-                        <td>Custom field type for drawing polylines, polygons, and circles on Google Maps. Stores Waze-compatible geometry JSON with distance, area, or radius.</td>
+                        <td>Custom field type for drawing polylines, polygons, and circles on Google Maps. Stores Waze-compatible geometry JSON with distance, area, or radius, and renders on map and pivot map reports.</td>
                     </tr>
                     <tr>
                         <td><strong>Waze Integration</strong></td>
@@ -80,11 +80,11 @@
             </div>
             <div class="panel-body">
                 <ul>
-                    <li><strong>Waze Closure Feed:</strong> Live CIFS feed endpoint publishes active road closures (Push to Waze checked, status Closed, drawn polyline) directly to the Waze app.</li>
-                    <li><strong>Reliable clearing:</strong> Every feed response uses a rolling expiry window, so reopened closures drop off Waze within minutes of being delisted.</li>
-                    <li><strong>Hardened feed URL:</strong> 128-bit secret key, blank 404 for any request without it, no search-engine indexing, one-click key regeneration.</li>
-                    <li><strong>Feed mapping UI:</strong> The Waze Integration page maps the Road Closures entity, its fields, the Closed status choice, direction, and Reason-to-subtype conversions.</li>
-                    <li><strong>Feed content:</strong> Actual closure start times, road-following polylines from the geometry field, direction, closure subtype, and description.</li>
+                    <li><strong>Geometry on map reports:</strong> Drawn closures now render on map reports and pivot map reports — the actual polyline, polygon, or circle is drawn on the map.</li>
+                    <li><strong>Status color-coding:</strong> Shape color follows the report Background Color field, so closures are colored by their road status.</li>
+                    <li><strong>Marker companion:</strong> Each shape also places a marker at its midpoint, keeping clustering, the sidebar list, and popups working and closures visible when zoomed out.</li>
+                    <li><strong>Mixed pivot layers:</strong> One pivot map can combine marker entities (shelters, resources) with geometry entities (road closures).</li>
+                    <li><strong>Popup fix:</strong> Geometry fields added to report popups now show the readable distance summary instead of an encoded polyline.</li>
                 </ul>
             </div>
         </div>

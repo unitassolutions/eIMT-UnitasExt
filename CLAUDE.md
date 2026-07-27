@@ -6,7 +6,7 @@
 
 **Repo:** `https://github.com/unitassolutions/eIMT-UnitasExt`  
 **Plugin directory:** `plugins/unitas_ext/` inside a Rukovoditel installation  
-**Current version:** 1.3.0  
+**Current version:** 1.4.0  
 **Rukovoditel compatibility:** 3.5+ (tested on 3.6.4, 3.7)
 
 ### Deployment Instances
@@ -153,6 +153,9 @@ Two patches applied by the installer:
 
 ### Drawing Modes
 The `drawing_mode` config dropdown offers polyline, polygon, and circle. A point (single marker) mode remains a possible future addition.
+
+### On Map Reports (v1.4.0)
+The geometry type is selectable as the map field for Unitas Map Reports and Pivot Map Reports (Google renderer only). Two shared statics on the field type do the work: `parse_for_map()` normalizes/validates a stored value and returns the shape plus a representative point; `render_map_shapes_js()` emits the Google Polyline/Polygon/Circle JS. In both map classes, `get_coordinates()` branches on the type **before** the legacy value normalization (which would corrupt JSON) and calls `add_geometry()`, which pushes to `$shapes[]` AND a companion marker into `$markers[]` — keeping clustering, sidebar, bounds, and the empty-state guard working. Shape color: background/status choice color → field `stroke_color` → `#FF0000`.
 
 ## Feature: Waze Integration (v1.2.0 — Phase 1)
 

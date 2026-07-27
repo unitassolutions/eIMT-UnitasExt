@@ -419,6 +419,157 @@ class fieldtype_unitas_geometry
         return $html;
     }
 
+    /**
+     * Normalize a stored geometry value for map report rendering.
+     *
+     * Returns false when the value cannot be drawn (malformed JSON, too few
+     * points, out-of-range coordinates, zero-radius circle). On success:
+     *   kind     — polyline | polygon | circle
+     *   points   — array of [lat, lng] (polyline/polygon)
+     *   center   — [lat, lng] (circle)
+     *   radius_m — float (circle)
+     *   lat/lng  — representative point for the companion map marker
+     *
+     * Lives here because this class owns the storage format; both
+     * map_reports and unitas_pivot_map_reports consume it.
+     */
+    public static function parse_for_map($value)
+    {
+        $data = json_decode((string)$value, true);
+        if (!is_array($data) || empty($data['type'])) return false;
+
+        $out = array('kind' => $data['type'], 'points' => array(), 'center' => null, 'radius_m' => 0, 'lat' => null, 'lng' => null);
+
+        if ($data['type'] === 'circle')
+        {
+            if (empty($data['center']) || !is_array($data['center']) || empty($data['radius_m'])) return false;
+            $lat = isset($data['center'][0]) ? $data['center'][0] : null;
+            $lng = isset($data['center'][1]) ? $data['center'][1] : null;
+            if (!self::valid_map_point($lat, $lng)) return false;
+            if ((float)$data['radius_m'] <= 0) return false;
+
+            $out['center']   = array((float)$lat, (float)$lng);
+            $out['radius_m'] = (float)$data['radius_m'];
+            $out['lat']      = (float)$lat;
+            $out['lng']      = (float)$lng;
+            return $out;
+        }
+
+        if ($data['type'] !== 'polyline' && $data['type'] !== 'polygon') return false;
+        if (empty($data['points']) || !is_array($data['points']) || count($data['points']) < 2) return false;
+
+        $points = array();
+        foreach ($data['points'] as $p)
+        {
+            if (!is_array($p) || !isset($p[0]) || !isset($p[1])) return false;
+            if (!self::valid_map_point($p[0], $p[1])) return false;
+            $points[] = array((float)$p[0], (float)$p[1]);
+        }
+        $out['points'] = $points;
+
+        if ($data['type'] === 'polyline')
+        {
+            // Middle vertex — always sits on the drawn path, no geodesic math
+            $mid = $points[(int)floor(count($points) / 2)];
+            $out['lat'] = $mid[0];
+            $out['lng'] = $mid[1];
+        }
+        else
+        {
+            $sum_lat = 0;
+            $sum_lng = 0;
+            foreach ($points as $p) { $sum_lat += $p[0]; $sum_lng += $p[1]; }
+            $out['lat'] = $sum_lat / count($points);
+            $out['lng'] = $sum_lng / count($points);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Emit Google Maps JS drawing each shape produced by parse_for_map().
+     * Shapes are pushed to the report page shapes[] array — never markers[],
+     * which feeds the marker clusterer and expects legacy Marker objects.
+     * Shared by map_reports and unitas_pivot_map_reports.
+     */
+    public static function render_map_shapes_js($shapes)
+    {
+        if (!is_array($shapes) || !count($shapes))
+        {
+            return '';
+        }
+
+        $html = '
+                var unitasGeoIW = new google.maps.InfoWindow();';
+
+        foreach ($shapes as $v)
+        {
+            $var   = 'geo' . preg_replace('/[^A-Za-z0-9_]/', '_', $v['id']);
+            $popup = str_replace(array("\n", "\r", "\n\r"), ' ', nl2br(urldecode($v['popup'])));
+
+            if ($v['kind'] === 'circle')
+            {
+                $html .= '
+                var ' . $var . ' = new google.maps.Circle({
+                    center: new google.maps.LatLng(' . $v['center'][0] . ',' . $v['center'][1] . '),
+                    radius: ' . $v['radius_m'] . ',
+                    strokeColor: "' . $v['color'] . '", strokeWeight: ' . $v['weight'] . ', strokeOpacity: 0.9,
+                    fillColor: "' . $v['color'] . '", fillOpacity: 0.2,
+                    map: map
+                });';
+            }
+            else
+            {
+                $path = array();
+                foreach ($v['points'] as $p)
+                {
+                    $path[] = '{lat:' . $p[0] . ',lng:' . $p[1] . '}';
+                }
+                $path_js = '[' . implode(',', $path) . ']';
+
+                if ($v['kind'] === 'polygon')
+                {
+                    $html .= '
+                var ' . $var . ' = new google.maps.Polygon({
+                    paths: ' . $path_js . ',
+                    strokeColor: "' . $v['color'] . '", strokeWeight: ' . $v['weight'] . ', strokeOpacity: 0.9,
+                    fillColor: "' . $v['color'] . '", fillOpacity: 0.2,
+                    map: map
+                });';
+                }
+                else
+                {
+                    $html .= '
+                var ' . $var . ' = new google.maps.Polyline({
+                    path: ' . $path_js . ',
+                    strokeColor: "' . $v['color'] . '", strokeWeight: ' . $v['weight'] . ', strokeOpacity: 0.9,
+                    map: map
+                });';
+                }
+            }
+
+            $html .= '
+                shapes.push(' . $var . ');
+
+                google.maps.event.addListener(' . $var . ', "click", function(e) {
+                    unitasGeoIW.close();
+                    unitasGeoIW.setContent(\'<div id="content">' . $popup . '</div>\');
+                    unitasGeoIW.setPosition(e.latLng);
+                    unitasGeoIW.open(map);
+                });';
+        }
+
+        return $html;
+    }
+
+    private static function valid_map_point($lat, $lng)
+    {
+        if (!is_numeric($lat) || !is_numeric($lng)) return false;
+        $lat = (float)$lat;
+        $lng = (float)$lng;
+        return ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180);
+    }
+
     private static function get_map_config()
     {
         static $cache = null;

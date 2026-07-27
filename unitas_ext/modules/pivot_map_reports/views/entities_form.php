@@ -45,9 +45,10 @@
             <span class="input-group-btn">
       				<button class="btn btn-default" type="button">&nbsp;</button>
       			</span>
-      		</div>      
-        </div>			
-      </div> 
+      		</div>
+      		<?php echo tooltip_text('Fixed color for this layer. Applies to drawn geometry shapes and to the map legend swatch. A Background Color field, when selected above, overrides it per record.') ?>
+        </div>
+      </div>
       
     <div class="form-group">
     	<label class="col-md-4 control-label" for="legend_label">Legend Label</label>
@@ -110,7 +111,14 @@ function check_field_type()
 	{
 		$('.from-group-background').show();
 		$('.from-group-marker-icon').show();
-		
+
+	}
+	else if(fields_type_by_id[field_id]=='fieldtype_unitas_geometry')
+	{
+		/* Geometry: background color drives the shape color, and a marker
+		   is placed at the shape midpoint so the icon still applies. */
+		$('.from-group-background').show();
+		$('.from-group-marker-icon').show();
 	}
 	else
 	{

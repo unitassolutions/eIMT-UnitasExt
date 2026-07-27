@@ -37,3 +37,11 @@
 * Rolling expiry window guarantees reopened closures clear from Waze within minutes of being delisted.
 * Feed mapping UI, secret URL key with one-click regeneration, and discovery-hardened responses.
 
+
+
+**Version 1.4.0**
+
+* Geometry fields can now be used as the map field on map reports and pivot map reports.
+* Drawn closures render as actual polylines, polygons, and circles, color-coded by road status.
+* Pivot maps can mix marker entities and geometry entities on a single map.
+

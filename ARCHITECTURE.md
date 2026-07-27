@@ -28,10 +28,21 @@
 **Decision:** Field type reads API key from `app_unitas_map_reports_config` table (Unitas Extension global config).
 **Rationale:** One API key per instance, managed in one place. Avoids per-field key configuration that would be tedious and error-prone. All Unitas map features share the same key.
 
+### ADR-020: Geometry on Map Reports — Shape Plus Companion Marker
+**Decision:** When a geometry field is the map field, each record produces a drawn shape in a new `shapes[]` array **and** an ordinary marker at a representative point (polyline → middle vertex, polygon → centroid, circle → center). Shapes never enter `markers[]`. Parsing and Google drawing live on the field type itself (`fieldtype_unitas_geometry::parse_for_map()` / `render_map_shapes_js()`), shared by both map classes.
+**Rationale:** `markers[]` feeds `markerClusterer` and the bounds pass calls `marker.getPosition()` — pushing a Polyline there would throw. The companion marker means clustering, the sidebar, bounds fitting, and the empty-state guard keep working untouched, and a 0.2-mile closure stays findable at county zoom where a thin line is a few pixels. Keeping parse/draw on the field type avoids duplicating ~90 lines across `map_reports` and `unitas_pivot_map_reports`, which already duplicate their other render methods.
+**Tradeoff:** Two clickable targets per record (shape and marker, same popup), and slightly more visual density on polygon/circle layers.
+
+### ADR-021: Geometry Values Bypass the Legacy Value Normalization
+**Decision:** `get_coordinates()` handles `fieldtype_unitas_geometry` from the **raw** column value before the shared per-value normalization, then `continue`s.
+**Rationale:** That block splits on `;`, squeezes `", "` to `","`, and truncates at `(` — all mapbbcode-specific rules that would corrupt or split a JSON object. Branching first also leaves every existing field type path byte-identical, so there is no regression surface.
+**Tradeoff:** Multiple geometry objects in one field value are not supported (one JSON object per record).
+
 ### Known Issues — Geometry
-- **Google Maps Drawing Manager** requires the `drawing` and `geometry` libraries loaded via the API URL. Both are loaded once per page with duplicate-load prevention.
+- **Maps API libraries:** the widget uses custom click-to-draw (DrawingManager was removed in Maps JS API v3.65) and needs only the `geometry` library. Map report shape drawing needs no extra library — it uses the stored `points` array, not `encoded_polyline`.
 - **TEXT column:** Polyline data stored as JSON text, not spatial data. Maximum size ~65KB per field value. Sufficient for road closures (even complex routes rarely exceed 1000 points = ~30KB JSON).
-- **No server-side validation:** The `process()` method validates JSON structure but does not validate that coordinates are within expected bounds. Malformed data would render an empty map.
+- **Validation split:** `process()` validates JSON structure on save; `parse_for_map()` additionally validates coordinate ranges and point counts at render time, skipping any record it cannot draw. A record with malformed geometry simply does not appear on the map report.
+- **Google renderer only:** geometry map reports route to the Google view. Yandex has no shape support in `render_yandex_js()`, and the Leaflet/OSM path draws only the legacy mapbbcode `coordinates` string format.
 
 ---
 

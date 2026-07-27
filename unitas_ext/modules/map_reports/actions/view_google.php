@@ -82,11 +82,15 @@ if($use_form_settings)
     {
         // Fallback to marker bounds
         $center_map_js = "
-            if(markers.length > 0)
+            if(markers.length > 0 || shapes.length > 0)
             {
                 var bounds = new google.maps.LatLngBounds();
                 markers.forEach(function(marker){
                     bounds.extend(marker.getPosition());
+                });
+                shapes.forEach(function(shape){
+                    if(typeof shape.getPath === 'function'){ shape.getPath().forEach(function(p){ bounds.extend(p); }); }
+                    else if(typeof shape.getBounds === 'function'){ bounds.union(shape.getBounds()); }
                 });
                 map.fitBounds(bounds);
             }
@@ -169,6 +173,7 @@ $(function(){
     addThemeControls(map);
 
     let markers=[];
+    let shapes=[];
     '.$map_reports->render_google_js().'
     '.$center_map_js.'
 
@@ -210,4 +215,4 @@ else
     $html .= '<div id="goolge_map_container" style="width:100%; height:600px;"></div>';
 }
 
-echo (count($map_reports->markers) ? $html : '<div class="alert alert-warning">' . TEXT_NO_RECORDS_FOUND . '</div>');
+echo ((count($map_reports->markers) || count($map_reports->shapes)) ? $html : '<div class="alert alert-warning">' . TEXT_NO_RECORDS_FOUND . '</div>');

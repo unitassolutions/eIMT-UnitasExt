@@ -88,7 +88,7 @@ switch ($app_module_action)
         $fields_type_by_id_js = '';
 
         $choices = array();
-        $fields_query = db_query("select * from app_fields where type in ('fieldtype_mapbbcode','fieldtype_yandex_map','fieldtype_google_map','fieldtype_google_map_directions') and entities_id='" . db_input($entities_id) . "'");
+        $fields_query = db_query("select * from app_fields where type in ('fieldtype_mapbbcode','fieldtype_yandex_map','fieldtype_google_map','fieldtype_google_map_directions','fieldtype_unitas_geometry') and entities_id='" . db_input($entities_id) . "'");
         while ($fields = db_fetch_array($fields_query))
         {
             $choices[$fields['id']] = $fields['name'];
