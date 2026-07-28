@@ -1,5 +1,42 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.5.0 (2026-07-27)
+
+### New Features
+- **Pivot Map Report v2 (Modern layout)** — Each pivot map report now has a Layout setting: Classic (default, unchanged) or Modern (v2), applying to Google maps. The modern layout renders a full-bleed map with floating panels instead of the boxed table shell.
+- **Interactive legend** — Floating card with one row per configured layer: icon or color swatch, per-layer counts, and an eye toggle that shows or hides that layer (markers, clusters, and geometry shapes together).
+- **Floating sidebar** — Collapsible card with live search and status-color pills, grouped by entity (as classic was) with a legend-layer sub-breakdown when an entity has multiple styled layers. Sidebar heading templates render their markup exactly as classic did. Clicking an item pans and zooms to the record and opens its popup (re-enabling the layer if it was hidden).
+- **Floating filter panel** — The report filter row renders as a floating card over the top of the map (returning to normal flow on narrow screens), restyled to match the v2 cards in light and dark.
+- **Modern popups** — The native InfoWindow chrome is restyled (rounded, shadowed, dark-mode aware) on v2 maps only.
+- **Colored pins** — In the modern layout, layers with a marker color and no custom icon get a colored SVG pin (classic Google pins ignored marker color).
+- **Light/dark aware** — Theme buttons carry over from classic (moved to bottom center); the modern cards and floating filter panel restyle for dark map themes. The native fullscreen control is disabled on v2 maps (it sat behind the collapsed-sidebar button), and the legend clears the Map/Satellite control.
+
+### Bug Fixes
+- **Checkbox save notices** — Saving a pivot map report with Display Legend or the sidebar unchecked raised PHP notices (missing null guards in the save handler). Fixed with no change to stored values.
+
+### Files Added
+| File | Purpose |
+|---|---|
+| `modules/pivot_map_reports/actions/view_google_v2.php` | v2 fragment: JSON payload + stage markup |
+| `modules/pivot_map_reports/components/view_google_v2.php` | v2 loader: assets, container, contract functions |
+| `js/pivot-map-v2.js` | UnitasPivotMapV2 renderer (map, layers, legend, sidebar) |
+| `css/pivot_map_v2.css` | Modern card styling, dark mode, responsive |
+
+### Files Changed
+| File | Change |
+|---|---|
+| `application_top.php` | Version 1.5.0 |
+| `install.php` | `layout` column on app_unitas_pivot_map_reports (create_tables + v1.5.0 migration) |
+| `classes/map/pivot_map_reports.php` | Additive: is_modern flag, entities_id/entity_row/name marker keys, get_item_name(), get_legend_data(), get_v2_payload() |
+| `modules/pivot_map_reports/views/form.php` | Layout select |
+| `modules/pivot_map_reports/actions/reports.php` | Saves layout; null guards for unchecked checkboxes |
+| `modules/pivot_map_reports/module_top.php` | view_google_v2 added to the non-admin action whitelist |
+| `modules/pivot_map_reports/views/view.php` / `views/public.php` | Modern-layout dispatch (classic path unchanged) |
+| `modules/about/views/index.php` | Features + Release Notes for v1.5.0 |
+| `readme.md` | Release summary entry |
+
+---
+
 ## v1.4.0 (2026-07-17)
 
 ### New Features

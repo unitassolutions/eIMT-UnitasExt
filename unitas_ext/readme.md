@@ -45,3 +45,12 @@
 * Drawn closures render as actual polylines, polygons, and circles, color-coded by road status.
 * Pivot maps can mix marker entities and geometry entities on a single map.
 
+
+
+**Version 1.5.0**
+
+* Pivot Map Report v2: opt-in modern layout with a full-bleed map and floating panels.
+* Interactive legend with per-layer show/hide toggles and counts.
+* Floating searchable sidebar; clicking an item zooms to the record and opens its popup.
+* Colored map pins and dark-mode styling in the modern layout.
+

@@ -50,7 +50,7 @@
                     </tr>
                     <tr>
                         <td><strong>Pivot Map Reports</strong></td>
-                        <td>Multi-entity map reports with custom markers, legends, filter panels, and sidebar support.</td>
+                        <td>Multi-entity map reports with custom markers, legends, filter panels, and sidebar support. Optional modern layout with an interactive layer legend and a searchable floating sidebar.</td>
                     </tr>
                     <tr>
                         <td><strong>HEIC Converter</strong></td>
@@ -80,11 +80,11 @@
             </div>
             <div class="panel-body">
                 <ul>
-                    <li><strong>Geometry on map reports:</strong> Drawn closures now render on map reports and pivot map reports — the actual polyline, polygon, or circle is drawn on the map.</li>
-                    <li><strong>Status color-coding:</strong> Shape color follows the report Background Color field, so closures are colored by their road status.</li>
-                    <li><strong>Marker companion:</strong> Each shape also places a marker at its midpoint, keeping clustering, the sidebar list, and popups working and closures visible when zoomed out.</li>
-                    <li><strong>Mixed pivot layers:</strong> One pivot map can combine marker entities (shelters, resources) with geometry entities (road closures).</li>
-                    <li><strong>Popup fix:</strong> Geometry fields added to report popups now show the readable distance summary instead of an encoded polyline.</li>
+                    <li><strong>Modern pivot map layout:</strong> Each pivot map report can switch to a modern full-bleed layout with floating panels. Classic reports are unchanged.</li>
+                    <li><strong>Interactive legend:</strong> The legend is now a floating card with per-layer counts and show/hide toggles for each layer.</li>
+                    <li><strong>Searchable sidebar:</strong> A floating, collapsible object list with live search and status-color pills. Clicking an item zooms to it and opens its popup.</li>
+                    <li><strong>Colored pins:</strong> Layers with a marker color and no custom icon now render colored map pins in the modern layout.</li>
+                    <li><strong>Dark mode:</strong> The modern panels restyle automatically when the map theme is dark.</li>
                 </ul>
             </div>
         </div>

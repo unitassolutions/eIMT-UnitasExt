@@ -6,7 +6,7 @@
 
 **Repo:** `https://github.com/unitassolutions/eIMT-UnitasExt`  
 **Plugin directory:** `plugins/unitas_ext/` inside a Rukovoditel installation  
-**Current version:** 1.4.0  
+**Current version:** 1.5.0  
 **Rukovoditel compatibility:** 3.5+ (tested on 3.6.4, 3.7)
 
 ### Deployment Instances
@@ -80,11 +80,13 @@ unitas_ext/
 │       └── pivot_map_reports.php                # Pivot map report class (with legend dedup + filter dedup)
 ├── css/
 │   ├── unitas_ext.css                           # Lightbox overlay + entity button + geometry widget styles
+│   ├── pivot_map_v2.css                         # Pivot map v2 (modern layout) cards, dark mode, responsive
 │   └── heic_converter.css                       # HEIC conversion overlay styles
 ├── db/
 │   └── unitas_ext__v1.0.1.sql                   # DB schema reference
 ├── js/
 │   ├── load-buttons.js                          # Entity button loader + report lightbox
+│   ├── pivot-map-v2.js                          # Pivot map v2 renderer (layers, legend, sidebar)
 │   ├── fieldtype/
 │   │   └── unitas_geometry.js                   # Custom click-to-draw map widget + Waze street-name autofill
 │   └── heic/
@@ -216,6 +218,9 @@ Filter panel links in `pivot_map_reports/views/entities.php` and `map_reports/vi
 
 ### JS Reload Functions
 The filter panel callback calls `load_pivot_map_report{id}()` and `load_map_report{id}()`. These functions must exist in the respective `view_google.php` components. They wrap `loadMapTheme()` to trigger map reload when filter values change.
+
+### Modern Layout (v2 — v1.5.0)
+Per-report `layout` column: `classic` (default) or `modern` (Google maps only). Modern dispatches to `components/view_google_v2.php` + `actions/view_google_v2.php`, which emit one JSON payload (`unitas_pivot_map_reports::get_v2_payload()`) rendered by `js/pivot-map-v2.js` + `css/pivot_map_v2.css`: full-bleed map, floating interactive legend (per-layer visibility toggles + counts), floating searchable sidebar (item click = zoom + popup), colored SVG pins when a layer has marker color and no icon, dark-mode cards. **CONTRACT:** the v2 component must define `load_pivot_map_report{id}()` with exactly that name — the filter-panel refetch callback calls it. `module_top.php` whitelists `view_google_v2` for non-admin users. Classic files are byte-identical apart from the dispatch branches in `views/view.php` / `views/public.php`.
 
 ## application_top.php — Injection Architecture
 

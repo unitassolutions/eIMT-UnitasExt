@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports` (
   `display_sidebar` tinyint(1) NOT NULL,
   `sidebar_width` varchar(16) NOT NULL,
   `map_type` varchar(20) NOT NULL DEFAULT 'google',
+  `layout` varchar(16) NOT NULL DEFAULT 'classic',
   `use_form_map_settings` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -214,6 +215,11 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
         }
         if (!self::column_exists('app_unitas_map_reports_config', 'waze_feed_config')) {
             db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN waze_feed_config text NULL AFTER waze_feed_window");
+        }
+
+        // v1.5.0: Pivot map v2 layout — opt-in modern renderer per report
+        if (!self::column_exists('app_unitas_pivot_map_reports', 'layout')) {
+            db_query("ALTER TABLE app_unitas_pivot_map_reports ADD COLUMN layout varchar(16) NOT NULL DEFAULT 'classic' AFTER map_type");
         }
     }
 

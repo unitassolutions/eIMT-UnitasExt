@@ -12,15 +12,22 @@
  */
 require_once dirname(__DIR__,3) . '/classes/map/pivot_map_reports.php';
 
-echo unitas_pivot_map_reports::render_legend($reports); 
+// Modern (v2) layout applies to Google maps only and draws its own legend
+$public_map_type = unitas_pivot_map_reports::get_map_type($reports['id']);
+$use_v2 = ((isset($reports['layout']) ? $reports['layout'] : 'classic') == 'modern' && $public_map_type == 'google');
 
-switch(unitas_pivot_map_reports::get_map_type($reports['id']))
+if(!$use_v2)
+{
+    echo unitas_pivot_map_reports::render_legend($reports);
+}
+
+switch($public_map_type)
 {
     case 'yandex':
         require(component_path('unitas_ext/pivot_map_reports/view_yandex'));
         break;
     case 'google':
-        require(component_path('unitas_ext/pivot_map_reports/view_google'));
+        require(component_path($use_v2 ? 'unitas_ext/pivot_map_reports/view_google_v2' : 'unitas_ext/pivot_map_reports/view_google'));
         break;
     case 'mapbbcode':
         require(component_path('unitas_ext/pivot_map_reports/view'));

@@ -17,14 +17,22 @@
 
         <div class="form-group">
             <label class="col-md-4 control-label"><?php echo TEXT_IN_MENU ?></label>
-            <div class="col-md-8">	
+            <div class="col-md-8">
                 <div class="checkbox-list">
                     <label class="checkbox-inline">
                         <?php echo input_checkbox_tag('in_menu', '1', array('checked' => $obj['in_menu'])) ?>
                     </label>
                 </div>
-            </div>			
-        </div> 
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-md-4 control-label">Layout</label>
+            <div class="col-md-8">
+                <?php echo select_tag('layout', array('classic' => 'Classic', 'modern' => 'Modern (v2)'), ($obj['layout'] ?? 'classic'), array('class' => 'form-control input-medium')) ?>
+                <?php echo tooltip_text('Modern layout applies to Google maps only. Other map types always use the classic layout.') ?>
+            </div>
+        </div>
 
         <?php
         $choices = [];

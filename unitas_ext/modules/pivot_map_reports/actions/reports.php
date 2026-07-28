@@ -11,16 +11,17 @@ switch($app_module_action)
   case 'save':
   
       $sql_data = array(
-      	'name'=>$_POST['name'],                              	      				      								 
-        'users_groups'=>(isset($_POST['access']) ? json_encode($_POST['access']):''),         
+      	'name'=>$_POST['name'],
+        'users_groups'=>(isset($_POST['access']) ? json_encode($_POST['access']):''),
         'in_menu'=>(isset($_POST['in_menu']) ? $_POST['in_menu']:0),
         'users_groups'=>(isset($_POST['users_groups']) ? implode(',',$_POST['users_groups']):''),
         'is_public_access' => $_POST['is_public_access'] ?? 0,
-        'zoom'=>$_POST['zoom'],
-        'latlng'=>trim(preg_replace('/ +/',',',$_POST['latlng'])),
-        'display_legend'=>$_POST['display_legend'],
-        'display_sidebar'=>$_POST['display_sidebar'],
-        'sidebar_width'=>$_POST['sidebar_width'],
+        'zoom'=>$_POST['zoom'] ?? '',
+        'latlng'=>trim(preg_replace('/ +/',',',$_POST['latlng'] ?? '')),
+        'display_legend'=>$_POST['display_legend'] ?? 0,
+        'display_sidebar'=>$_POST['display_sidebar'] ?? 0,
+        'sidebar_width'=>$_POST['sidebar_width'] ?? '',
+        'layout'=>(in_array($_POST['layout'] ?? 'classic', array('classic','modern')) ? ($_POST['layout'] ?? 'classic') : 'classic'),
         'use_form_map_settings' => $_POST['use_form_map_settings'] ?? 0
       );
                                                                                     

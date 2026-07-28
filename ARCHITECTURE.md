@@ -120,6 +120,11 @@ Overrides:
 **Decision:** Added `legend_label` column to `app_unitas_pivot_map_reports_entities`. Used in legend when populated, falls back to entity name.
 **Rationale:** When same entity appears multiple times, all legend items would show the same entity name. Custom labels allow "Open Shelters", "Closed Shelters", etc.
 
+### ADR-022: Opt-In Layout Column with a Parallel v2 Renderer
+**Decision:** Pivot map reports carry a `layout` column ('classic' default | 'modern'). Modern routes to a parallel component/action pair (`view_google_v2`) that emits ONE `json_encode` payload consumed by `js/pivot-map-v2.js`; classic files stay byte-identical apart from the two dispatch branches. The filter-panel contract is preserved: the v2 component still defines `load_pivot_map_report{id}()` — the refetch callback generated in `render_entity_filters_panel()` calls exactly that name — and the fragment POST keeps `{id, map_theme}`.
+**Rationale:** Existing reports must not change; a per-report toggle reuses every admin screen, table, and filter panel with zero duplicate setup. A structured payload replaces the classic string-concatenated JS, which cannot support an interactive UI (layer toggles, search, and popups need marker registries). Marker/shape arrays gained additive keys (`entities_id`, `entity_row`, `name`) that classic renderers never read.
+**Tradeoff:** Two Google renderers to maintain. v2 intentionally diverges where classic was broken or dated: scoped DOM ids instead of the global misspelled `goolge_map_container`, colored pins honor marker color, and every configured layer appears in the v2 legend (classic omitted layers without a color or icon).
+
 ### Known Issues — Pivot Map
 - `render_entity_filters_panel()` and `render_legend()` require `unitas_pivot_map_reports::` class prefix (not `pivot_map_reports::`) and a `require_once` before the static method calls.
 - The Ruko Extension classes (`pivot_map_reports::`) are autoloaded by the `ext` plugin. Unitas classes are not autoloaded — they must be explicitly required.

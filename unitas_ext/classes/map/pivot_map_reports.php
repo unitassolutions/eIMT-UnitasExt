@@ -20,10 +20,12 @@ class unitas_pivot_map_reports
     private $marker_color;
     private $marker_icon;
     private $field_info;
+    private $is_modern;
 
     function __construct($reports)
     {
         $this->reports_id = $reports['id'];
+        $this->is_modern = ((isset($reports['layout']) ? $reports['layout'] : '') == 'modern');
         $this->markers = array();
         $this->shapes = array();
         $this->polyline = array();
@@ -192,7 +194,7 @@ class unitas_pivot_map_reports
                                 $lat = $value[0];
                                 $lng = $value[1];
 
-                                $this->markers[] = ['id' => $items['id'] . '_' . $map_entities['id'] . '_' . $address_key, 'lat' => $lat, 'lng' => $lng, 'color' => $color, 'icon' => $this->marker_icon, 'popup' => $this->get_popup($items, $value[2])];
+                                $this->markers[] = ['id' => $items['id'] . '_' . $map_entities['id'] . '_' . $address_key, 'lat' => $lat, 'lng' => $lng, 'color' => $color, 'icon' => $this->marker_icon, 'entities_id' => $this->entities_id, 'entity_row' => $map_entities['id'], 'name' => $this->get_item_name($map_entities, $items), 'popup' => $this->get_popup($items, $value[2])];
                             }
                             break;
                         default:
@@ -203,20 +205,13 @@ class unitas_pivot_map_reports
                                 $lat = $value[0];
                                 $lng = $value[1];
 
-                                $this->markers[] = ['id' => $items['id'] . '_' . $map_entities['id'], 'lat' => $lat, 'lng' => $lng, 'color' => $color, 'icon' => $this->marker_icon, 'popup' => $this->get_popup($items)];
+                                $name = $this->get_item_name($map_entities, $items);
+
+                                $this->markers[] = ['id' => $items['id'] . '_' . $map_entities['id'], 'lat' => $lat, 'lng' => $lng, 'color' => $color, 'icon' => $this->marker_icon, 'entities_id' => $this->entities_id, 'entity_row' => $map_entities['id'], 'name' => $name, 'popup' => $this->get_popup($items)];
 
                                 if($this->display_sidebar)
                                 {
                                     //set sidebar
-                                    if(strlen($map_entities['fields_in_sidebar']))
-                                    {
-                                        $name = $text_pattern->output_singe_text($map_entities['fields_in_sidebar'], $this->entities_id, $items);
-                                    }
-                                    else
-                                    {
-                                        $name = items::get_heading_field($this->entities_id, $items['id'], $items);
-                                    }
-
                                     $this->sidebar[$this->entities_id][] = [
                                         'lat' => $lat,
                                         'lng' => $lng,
@@ -306,25 +301,31 @@ class unitas_pivot_map_reports
 
         $id    = $items['id'] . '_' . $map_entities['id'];
         $popup = $this->get_popup($items);
+        $name  = $this->get_item_name($map_entities, $items);
 
         $this->shapes[] = array(
-            'id'       => $id,
-            'kind'     => $shape['kind'],
-            'points'   => $shape['points'],
-            'center'   => $shape['center'],
-            'radius_m' => $shape['radius_m'],
-            'color'    => $color,
-            'weight'   => $weight,
-            'popup'    => $popup,
+            'id'          => $id,
+            'kind'        => $shape['kind'],
+            'points'      => $shape['points'],
+            'center'      => $shape['center'],
+            'radius_m'    => $shape['radius_m'],
+            'color'       => $color,
+            'weight'      => $weight,
+            'entities_id' => $this->entities_id,
+            'entity_row'  => $map_entities['id'],
+            'popup'       => $popup,
         );
 
         $this->markers[] = array(
-            'id'    => $id,
-            'lat'   => $shape['lat'],
-            'lng'   => $shape['lng'],
-            'color' => $color,
-            'icon'  => $this->marker_icon,
-            'popup' => $popup,
+            'id'          => $id,
+            'lat'         => $shape['lat'],
+            'lng'         => $shape['lng'],
+            'color'       => $color,
+            'icon'        => $this->marker_icon,
+            'entities_id' => $this->entities_id,
+            'entity_row'  => $map_entities['id'],
+            'name'        => $name,
+            'popup'       => $popup,
         );
 
         if(!$this->latlng)
@@ -334,17 +335,6 @@ class unitas_pivot_map_reports
 
         if($this->display_sidebar)
         {
-            $text_pattern = new fieldtype_text_pattern;
-
-            if(strlen($map_entities['fields_in_sidebar']))
-            {
-                $name = $text_pattern->output_singe_text($map_entities['fields_in_sidebar'], $this->entities_id, $items);
-            }
-            else
-            {
-                $name = items::get_heading_field($this->entities_id, $items['id'], $items);
-            }
-
             $this->sidebar[$this->entities_id][] = [
                 'lat'   => $shape['lat'],
                 'lng'   => $shape['lng'],
@@ -352,6 +342,152 @@ class unitas_pivot_map_reports
                 'name'  => $name,
             ];
         }
+    }
+
+    /**
+     * Display name for a record: the sidebar heading template when set,
+     * else the entity heading field. Computed only when a consumer exists
+     * (classic sidebar or the v2 layout) to avoid extra work per record.
+     */
+    private function get_item_name($map_entities, $items)
+    {
+        if(!$this->display_sidebar && !$this->is_modern)
+        {
+            return '';
+        }
+
+        if(strlen($map_entities['fields_in_sidebar']))
+        {
+            $text_pattern = new fieldtype_text_pattern;
+            return $text_pattern->output_singe_text($map_entities['fields_in_sidebar'], $this->entities_id, $items);
+        }
+
+        return items::get_heading_field($this->entities_id, $items['id'], $items);
+    }
+
+    /**
+     * Structured legend/layer rows for the v2 renderer. Unlike render_legend()
+     * this returns EVERY configured entity row (the v2 legend is also the
+     * layer visibility control), with the swatch resolved by the classic
+     * precedence: icon wins, then marker color, then geometry stroke color.
+     */
+    static function get_legend_data($reports)
+    {
+        $rows = array();
+
+        $items_query = db_query("select ce.*, e.name as entity_name, f.type as field_type, f.configuration as field_configuration from app_unitas_pivot_map_reports_entities ce inner join app_entities e on e.id=ce.entities_id left join app_fields f on f.id=ce.fields_id where ce.reports_id='" . (int)$reports['id'] . "' order by ce.id");
+        while($items = db_fetch_array($items_query))
+        {
+            $is_geometry = ($items['field_type'] === 'fieldtype_unitas_geometry');
+
+            $color = strlen($items['marker_color'] ?? '') ? $items['marker_color'] : null;
+            if($is_geometry && $color === null)
+            {
+                $geo_cfg = new fields_types_cfg($items['field_configuration']);
+                $color = $geo_cfg->get('stroke_color');
+                if(!strlen($color)) $color = '#FF0000';
+            }
+
+            $label = (strlen(trim($items['legend_label'] ?? '')) > 0) ? $items['legend_label'] : $items['entity_name'];
+
+            $rows[] = array(
+                'key'         => (int)$items['id'],
+                'entities_id' => (int)$items['entities_id'],
+                'entity_name' => $items['entity_name'],
+                'label'       => $label,
+                'kind'        => $is_geometry ? 'geometry' : 'marker',
+                'icon'        => strlen($items['marker_icon'] ?? '') ? $items['marker_icon'] : null,
+                'color'       => $color,
+                'count'       => 0,
+            );
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Everything the v2 (modern layout) renderer needs, as one array the
+     * action json_encodes. Popup HTML is converted to display form here:
+     * get_popup() returns addslashes()-escaped single-line HTML meant for
+     * direct embedding in classic script strings — the JSON path reverses
+     * that and applies the same urldecode + nl2br display transform.
+     */
+    function get_v2_payload($reports, $resolved)
+    {
+        $layers = self::get_legend_data($reports);
+
+        // counts by layer key (every geometry item also has a companion marker)
+        $counts = array();
+        foreach($this->markers as $m)
+        {
+            $row = (int)($m['entity_row'] ?? 0);
+            $counts[$row] = ($counts[$row] ?? 0) + 1;
+        }
+        foreach($layers as $k => $layer)
+        {
+            $layers[$k]['count'] = $counts[$layer['key']] ?? 0;
+        }
+
+        $markers = array();
+        foreach($this->markers as $m)
+        {
+            $markers[] = array(
+                'id'    => (string)$m['id'],
+                'layer' => (int)($m['entity_row'] ?? 0),
+                'lat'   => (float)$m['lat'],
+                'lng'   => (float)$m['lng'],
+                'color' => (string)($m['color'] ?? ''),
+                'icon'  => (string)($m['icon'] ?? ''),
+                'name'  => (string)($m['name'] ?? ''),
+                'popup' => $this->v2_popup($m['popup'] ?? ''),
+            );
+        }
+
+        $shapes = array();
+        foreach($this->shapes as $s)
+        {
+            $shapes[] = array(
+                'id'       => (string)$s['id'],
+                'layer'    => (int)($s['entity_row'] ?? 0),
+                'kind'     => $s['kind'],
+                'points'   => $s['points'],
+                'center'   => $s['center'],
+                'radius_m' => (float)$s['radius_m'],
+                'color'    => (string)$s['color'],
+                'weight'   => (int)$s['weight'],
+                'popup'    => $this->v2_popup($s['popup'] ?? ''),
+            );
+        }
+
+        return array(
+            'report' => array(
+                'id'              => (int)$reports['id'],
+                'container'       => 'unitas_pmv2_' . (int)$reports['id'],
+                'theme'           => $resolved['theme'],
+                'theme_choice'    => $resolved['theme_choice'],
+                'map_id'          => $resolved['map_id'],
+                'zoom'            => (int)$resolved['zoom'],
+                'center'          => $resolved['center'],
+                'display_sidebar' => (int)$reports['display_sidebar'],
+                'display_legend'  => (int)$reports['display_legend'],
+                'sidebar_width'   => (strlen($reports['sidebar_width'] ?? '') ? (int)$reports['sidebar_width'] : 250),
+                'reload_fn'       => 'unitasPmv2Reload_' . (int)$reports['id'],
+            ),
+            'layers'  => array_values($layers),
+            'markers' => $markers,
+            'shapes'  => $shapes,
+            'i18n'    => array(
+                'search'     => defined('TEXT_SEARCH') ? TEXT_SEARCH : 'Search',
+                'no_records' => defined('TEXT_NO_RECORDS_FOUND') ? TEXT_NO_RECORDS_FOUND : 'No records found',
+                'layers'     => 'Layers',
+                'objects'    => 'Objects',
+            ),
+        );
+    }
+
+    private function v2_popup($popup)
+    {
+        return nl2br(urldecode(stripslashes((string)$popup)));
     }
 
     function set_latlng($value)
