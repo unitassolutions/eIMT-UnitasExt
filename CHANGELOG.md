@@ -1,5 +1,47 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.5.2 (2026-07-27)
+
+### Bug Fixes
+- **Menu items did not render** — A Unitas report added in Menu Configuration saved correctly and marked its parent as having children, but the child link never appeared. Two causes, both fixed:
+  - Core derives the report id with `str_replace(self::get_reports_types(), '', $reports_type)`, which strips only the type names in its own hardcoded list. Ours are not in it, so the whole value (`unitaspivotmap2`) arrived where an id was expected and cast to `0`. The plugin now takes the id from the value itself.
+  - The v1.5.1 patch injected `case` blocks into a switch matched by position (first `pivot_map_reports` case in the file), which is fragile if that file has more than one such switch. The patch now injects a single call at the top of `build_menu()`, anchored on the function signature, and the plugin parses the saved list itself — no dependence on switch contents, ordering, or core prefix matching.
+- The installer **migrates instances already patched by v1.5.1**: it removes the old case block, keeps the choices shim, and applies the new form. Re-running is a no-op.
+
+- **Background Color hidden for Google map layers** — In the pivot map entity configuration, the Background Color field was hidden whenever the chosen map field was a Google Map type, a rule inherited from the original design. But Background Color now drives the legend swatch and, in the v2 layout, the colored pins and sidebar status pills, so it is meaningful for Google map layers. The field is now shown for every map field type.
+- **Multi-value status fields as Background Color** — The Background Color dropdown now offers `fieldtype_dropdown_multiple` and `fieldtype_checkboxes` in addition to single-value dropdown / radio / autostatus. These store a comma-separated list of choice ids, so the layer colors each record by its first selected choice. Single-value fields are unaffected. `fieldtype_dropdown_multilevel` is intentionally excluded (different value format). Pivot map only.
+
+### Files Changed
+| File | Change |
+|---|---|
+| `application_top.php` | Version 1.5.2; `unitas_ext_menu_build_item()` now takes the whole reports list and derives ids itself |
+| `install.php` | Position-independent `build_menu()` patch + automatic migration of the v1.5.1 shim |
+| `modules/pivot_map_reports/views/entities_form.php` | Background Color shown for Google map layers |
+| `modules/pivot_map_reports/actions/entities.php` | Multi-value types eligible for Background Color |
+| `classes/map/pivot_map_reports.php` | `get_background_color()` colors by the first choice id of multi-value fields |
+
+---
+
+## v1.5.1 (2026-07-27)
+
+### New Features
+- **Unitas map reports in the main Menu Configuration** — Unitas Map Reports and Unitas Pivot Map Reports can now be placed in the application menu from Application Structure > Entities > Menu, alongside native reports, with the usual icon, color, access groups, and sort order. Core builds that dropdown from a hardcoded query list with no plugin hook, so the installer adds a third core patch: two one-line shims in `includes/classes/model/entities_menu.php` that call `unitas_ext_menu_reports_choices()` and `unitas_ext_menu_build_item()` in `application_top.php`. All logic lives in the plugin, so only a Rukovoditel core update (never a plugin change) can require re-patching.
+- Saved menu values use the prefixes `unitasmap{id}` and `unitaspivotmap{id}`, chosen so core `strstr` matching on `map_reports` / `pivot_map_reports` / `image_map` cannot swallow them; the injected switch cases are placed ahead of the Extension cases for the same reason.
+
+### Bug Fixes
+- **Plugin menu duplication** — The plugin menu components skipped a report when it appeared in `app_entities_menu` under the *Extension* prefixes (`map_reports{id}` / `pivot_map_reports{id}`), which never matched a Unitas report and could collide with an Extension report of the same numeric id. They now check the Unitas prefixes, so a report placed in the main menu no longer also appears under the plugin menu.
+- **Pivot menu access check** — `components/menu.php` called `pivot_map_reports::has_access()` (the Extension class) instead of `unitas_pivot_map_reports::has_access()`, which would fatal if the Extension were ever absent. Now uses the Unitas class with an explicit `require_once`.
+
+### Files Changed
+| File | Change |
+|---|---|
+| `application_top.php` | Version 1.5.1; `unitas_ext_menu_reports_choices()` + `unitas_ext_menu_build_item()` |
+| `install.php` | Third core patch for `entities_menu.php`; patch-status check extended |
+| `modules/map_reports/components/menu.php` | Unitas menu prefix |
+| `modules/pivot_map_reports/components/menu.php` | Unitas menu prefix, correct access class |
+
+---
+
 ## v1.5.0 (2026-07-27)
 
 ### New Features

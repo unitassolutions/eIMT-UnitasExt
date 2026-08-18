@@ -11,7 +11,7 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.5.0');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.5.2');
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
 // Load installer
@@ -56,6 +56,94 @@ if (unitas_ext_installer::is_installed() && unitas_ext_installer::needs_upgrade(
 
 // Load entity buttons class (tables are guaranteed to exist after install)
 require_once PLUGIN_UNITAS_EXT_PATH . '/classes/EntityButtons.php';
+
+// ── Menu Configuration integration ──────────────────────────────────────────
+// Core builds the Application Structure > Entities > Menu report dropdown from
+// a hardcoded list of queries with no plugin hook, so install.php patches
+// includes/classes/model/entities_menu.php with two one-line shims that call
+// the functions below. Keeping every bit of logic here means a plugin change
+// never requires re-patching core — only a Rukovoditel update does.
+//
+// Saved menu values use the prefixes unitasmap{id} and unitaspivotmap{id};
+// both are deliberately free of the substrings core matches with strstr
+// (map_reports, pivot_map_reports, image_map).
+
+if (!function_exists('unitas_ext_menu_reports_choices')) {
+    function unitas_ext_menu_reports_choices($choices)
+    {
+        $q = db_query("select id, name from app_unitas_map_reports order by name");
+        while ($r = db_fetch_array($q)) {
+            $choices['UNITAS Map Reports']['unitasmap' . $r['id']] = $r['name'];
+        }
+
+        $q = db_query("select id, name from app_unitas_pivot_map_reports order by name");
+        while ($r = db_fetch_array($q)) {
+            $choices['UNITAS Pivot Map Reports']['unitaspivotmap' . $r['id']] = $r['name'];
+        }
+
+        return $choices;
+    }
+}
+
+if (!function_exists('unitas_ext_menu_build_item')) {
+    function unitas_ext_menu_build_item($reports_list, $sub_menu)
+    {
+        if (!isset($reports_list) || !strlen($reports_list)) {
+            return $sub_menu;
+        }
+
+        // Parse the saved list ourselves rather than relying on the core loop.
+        // Core derives its id with str_replace(get_reports_types(), ...), which
+        // only strips type names it knows about — ours are not in that list, so
+        // its $reports_id would arrive as the whole value. Core simply matches
+        // none of its own cases for our entries and leaves them to us.
+        foreach (explode(',', $reports_list) as $value) {
+            $value = trim($value);
+
+            $is_pivot = (strpos($value, 'unitaspivotmap') === 0);
+            $is_map   = (strpos($value, 'unitasmap') === 0);
+
+            if (!$is_pivot && !$is_map) {
+                continue;
+            }
+
+            $reports_id = (int)preg_replace('/[^0-9]/', '', $value);
+            if ($reports_id <= 0) {
+                continue;
+            }
+
+            if ($is_pivot) {
+                require_once PLUGIN_UNITAS_EXT_PATH . '/classes/map/pivot_map_reports.php';
+
+                $q = db_query("select id, name, users_groups from app_unitas_pivot_map_reports where id='" . $reports_id . "'");
+                while ($r = db_fetch_array($q)) {
+                    if (unitas_pivot_map_reports::has_access($r['users_groups'])) {
+                        $sub_menu[] = array(
+                            'title' => $r['name'],
+                            'url'   => url_for('unitas_ext/pivot_map_reports/view', 'id=' . $r['id']),
+                            'class' => 'fa-map-marker'
+                        );
+                    }
+                }
+            } else {
+                require_once PLUGIN_UNITAS_EXT_PATH . '/classes/map/map_reports.php';
+
+                $q = db_query("select id, name, users_groups from app_unitas_map_reports where id='" . $reports_id . "'");
+                while ($r = db_fetch_array($q)) {
+                    if (map_reports::has_access($r['users_groups'])) {
+                        $sub_menu[] = array(
+                            'title' => $r['name'],
+                            'url'   => url_for('unitas_ext/map_reports/view', 'id=' . $r['id']),
+                            'class' => 'fa-map-marker'
+                        );
+                    }
+                }
+            }
+        }
+
+        return $sub_menu;
+    }
+}
 
 // ── Build injection HTML ────────────────────────────────────────────────────
 // All HTML is collected here, then injected before </body> via ob_start().
@@ -161,6 +249,12 @@ if (isset($_GET['is_modal']) || isset($_GET['is_embed'])) {
         #yandex_map_container,
         .map-container {
             height: calc(100vh - 75px) !important;
+            min-height: 400px !important;
+        }
+		
+		/* v2 Map containers: 100vh - 10px top margin - 8px bottom pad - 12px buffer */
+        .unitas-pmv2-stage {
+            height: calc(100vh - 30px) !important;
             min-height: 400px !important;
         }
 

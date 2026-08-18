@@ -59,7 +59,7 @@ Follows the Rukovoditel Extension pattern using `app_configuration` table:
 
 **Upgrades:** On each page load, `application_top.php` compares `PLUGIN_UNITAS_EXT_VERSION` vs `CFG_PLUGIN_UNITAS_EXT_DB_VERSION`. If plugin version is higher, `run_migrations()` fires silently — checks column existence before ALTER TABLE, re-applies core patches, updates DB version.
 
-**Core file patches:** The installer patches two Rukovoditel core files to register the geometry field type. These must be re-applied after Rukovoditel core updates. The install/upgrade page shows patch status.
+**Core file patches:** The installer patches three Rukovoditel core files — two to register the geometry field type, one to expose Unitas map reports in the main Menu Configuration. These must be re-applied after Rukovoditel core updates. The install/upgrade page shows patch status.
 
 ## Plugin File Structure
 
@@ -149,9 +149,13 @@ Stored as JSON in a TEXT column:
 - **Libraries:** Google Maps JS API with the `geometry` library only (`encodePath()`, spherical math).
 
 ### Core File Patches Required
-Two patches applied by the installer:
+Three patches applied by the installer (`install.php::patch_core_files()`):
 1. `includes/application_core.php` — adds `require` for our field type class after `fieldtype_google_drive.php`
 2. `includes/classes/fields_types.php` — adds `'fieldtype_unitas_geometry'` after `'fieldtype_mind_map'` in the Maps group
+3. `includes/classes/model/entities_menu.php` (v1.5.1, reworked v1.5.2) — two one-line shims so Unitas map reports appear in Application Structure > Entities > Menu. Core has NO hook for that dropdown: `get_reports_choices()` is a hardcoded query list and `build_menu()` a `switch(true)` of `strstr` cases. Shim A goes before `get_reports_choices()` returns; shim B is the FIRST statement of `build_menu()` (anchored on the function signature, never inside the switch). Both call functions in `application_top.php`, so all logic stays in the plugin.
+   - Menu value prefixes: `unitasmap{id}` / `unitaspivotmap{id}`, deliberately free of the substrings core matches (`map_reports`, `pivot_map_reports`, `image_map`).
+   - **Never trust the `$reports_id` core computes for our entries.** It comes from `str_replace(self::get_reports_types(), '', $reports_type)`, which only strips type names core knows — ours are absent, so the full value survives and casts to `0`. `unitas_ext_menu_build_item()` receives the raw `$reports_list` and parses ids itself.
+   - The installer auto-migrates the older v1.5.1 case-based shim to this form.
 
 ### Drawing Modes
 The `drawing_mode` config dropdown offers polyline, polygon, and circle. A point (single marker) mode remains a possible future addition.

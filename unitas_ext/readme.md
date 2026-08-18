@@ -54,3 +54,10 @@
 * Floating searchable sidebar; clicking an item zooms to the record and opens its popup.
 * Colored map pins and dark-mode styling in the modern layout.
 
+
+
+**Version 1.5.1**
+
+* Unitas map reports and pivot map reports can now be added to the main application menu from Application Structure > Entities > Menu.
+* Reports placed in the main menu no longer appear twice in the navigation.
+

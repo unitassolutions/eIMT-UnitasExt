@@ -251,20 +251,27 @@ class unitas_pivot_map_reports
             {
                 if(isset($app_fields_cache[$this->entities_id][$this->background]))
                 {
+                    // Multi-value status fields (dropdown_multiple, checkboxes)
+                    // store a comma-separated list of choice ids; color by the
+                    // first selected choice. Single-value fields are unaffected
+                    // — explode returns the lone id unchanged.
+                    $bg_parts  = explode(',', $items['field_' . $this->background]);
+                    $bg_choice = trim($bg_parts[0]);
+
                     $cfg = new fields_types_cfg($app_fields_cache[$this->entities_id][$this->background]['configuration']);
 
                     if($cfg->get('use_global_list') > 0)
                     {
-                        if(isset($app_global_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        if(isset($app_global_choices_cache[$bg_choice]['bg_color']))
                         {
-                            $color = $app_global_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                            $color = $app_global_choices_cache[$bg_choice]['bg_color'];
                         }
                     }
                     else
                     {
-                        if(isset($app_choices_cache[$items['field_' . $this->background]]['bg_color']))
+                        if(isset($app_choices_cache[$bg_choice]['bg_color']))
                         {
-                            $color = $app_choices_cache[$items['field_' . $this->background]]['bg_color'];
+                            $color = $app_choices_cache[$bg_choice]['bg_color'];
                         }
                     }
                 }

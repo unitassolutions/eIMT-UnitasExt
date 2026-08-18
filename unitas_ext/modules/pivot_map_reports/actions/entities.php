@@ -169,8 +169,11 @@ switch($app_module_action)
           </div>
         ';
 
+        // Multi-value types (dropdown_multiple, checkboxes) are eligible too —
+        // the layer colors each record by the first selected choice. Multilevel
+        // dropdowns are intentionally excluded (different value format).
         $choices = array('' => '');
-        $fields_query = db_query("select * from app_fields where type in ('fieldtype_dropdown','fieldtype_radioboxes','fieldtype_autostatus') and entities_id='" . db_input($entities_id) . "'");
+        $fields_query = db_query("select * from app_fields where type in ('fieldtype_dropdown','fieldtype_radioboxes','fieldtype_autostatus','fieldtype_dropdown_multiple','fieldtype_checkboxes') and entities_id='" . db_input($entities_id) . "'");
         while($fields = db_fetch_array($fields_query))
         {
             $choices[$fields['id']] = $fields['name'];

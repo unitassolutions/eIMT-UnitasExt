@@ -4,8 +4,10 @@ $reports_query = db_query("select * from app_unitas_map_reports order by name");
 while($reports = db_fetch_array($reports_query))
 {	
 	if(map_reports::has_access($reports['users_groups']))
-	{		
-		$check_query = db_query("select id from app_entities_menu where find_in_set('map_reports" . $reports['id']. "',reports_list)");
+	{
+		// Skip when the report is already placed in the main menu via
+		// Application Structure > Entities > Menu (prefix set by application_top.php)
+		$check_query = db_query("select id from app_entities_menu where find_in_set('unitasmap" . $reports['id']. "',reports_list)");
 		if(!$check = db_fetch_array($check_query))
 		{
 			if($reports['in_menu'])

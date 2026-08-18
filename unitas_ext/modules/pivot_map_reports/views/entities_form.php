@@ -103,9 +103,12 @@ function check_field_type()
 	//alert(field_id)
 	if(fields_type_by_id[field_id]=='fieldtype_google_map' || fields_type_by_id[field_id]=='fieldtype_google_map_directions')
 	{
-		$('.from-group-background').hide();
+		/* Background Color drives the legend swatch and, in the v2 layout, the
+		   colored pins and sidebar status pills, so it applies to Google map
+		   layers too. */
+		$('.from-group-background').show();
 		$('.from-group-marker-icon').show();
-		
+
 	}
         else if(fields_type_by_id[field_id]=='fieldtype_yandex_map')
 	{

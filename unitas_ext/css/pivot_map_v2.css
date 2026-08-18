@@ -253,15 +253,20 @@
     padding: 4px 0 8px;
 }
 
+/* Sticky group headers need their OWN opaque background: the scroll body has
+   no background of its own, so `inherit` was transparent and rows scrolled
+   visibly underneath the header. */
 .unitas-pmv2-group-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px 4px;
+    padding: 8px 12px 6px;
     cursor: pointer;
     position: sticky;
     top: 0;
-    background: inherit;
+    z-index: 2;
+    background: #ffffff;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 }
 
 .unitas-pmv2-group-title {
@@ -459,7 +464,7 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.10);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
-    padding: 8px 14px 4px;
+    padding: 4px 14px 8px;
 }
 
 .unitas-pmv2-filters .portlet {
@@ -578,6 +583,11 @@
 
 .unitas-pmv2-dark .unitas-pmv2-group-title {
     color: #9aa7b4;
+}
+
+.unitas-pmv2-dark .unitas-pmv2-group-head {
+    background: #1f2430;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .unitas-pmv2-dark .unitas-pmv2-subgroup-title {

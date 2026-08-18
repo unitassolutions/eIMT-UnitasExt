@@ -258,16 +258,19 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
     {
         $core_file = 'includes/application_core.php';
         $types_file = 'includes/classes/fields_types.php';
+        $menu_file = 'includes/classes/model/entities_menu.php';
 
-        if (!file_exists($core_file) || !file_exists($types_file)) return false;
+        if (!file_exists($core_file) || !file_exists($types_file) || !file_exists($menu_file)) return false;
 
         $core_content = file_get_contents($core_file);
         $types_content = file_get_contents($types_file);
+        $menu_content = file_get_contents($menu_file);
 
         $has_require = (strpos($core_content, 'fieldtype_unitas_geometry') !== false);
         $has_choice = (strpos($types_content, 'fieldtype_unitas_geometry') !== false);
+        $has_menu = (strpos($menu_content, 'unitas_ext_menu_build_item($reports_list') !== false);
 
-        return ($has_require && $has_choice);
+        return ($has_require && $has_choice && $has_menu);
     }
 
     /**
@@ -331,6 +334,69 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
             }
         } else {
             $results['errors'][] = 'fields_types.php (file not found)';
+        }
+
+        // Patch 3: entities_menu.php — let Unitas map reports be placed in the
+        // main menu (Application Structure > Entities > Menu). Core has no hook
+        // for this, so two one-line shims are injected that call functions
+        // defined in application_top.php. All logic stays in the plugin, so
+        // only a core update (not a plugin change) can require re-patching.
+        $menu_file = 'includes/classes/model/entities_menu.php';
+        if (file_exists($menu_file)) {
+            $content = file_get_contents($menu_file);
+
+            // Current shim signature. v1.5.1 injected switch cases instead,
+            // which depended on matching the right switch in the file; the
+            // block below migrates that older form automatically.
+            if (strpos($content, 'unitas_ext_menu_build_item($reports_list') === false) {
+
+                // Remove the v1.5.1 case-based shim if it is present
+                $content = preg_replace(
+                    '/\s*case\s+strstr\(\$reports_type,\s*\'unitaspivotmap\'\)\s*:\s*case\s+strstr\(\$reports_type,\s*\'unitasmap\'\)\s*:\s*if\(function_exists\(\'unitas_ext_menu_build_item\'\)\)[^\n]*\n\s*break;\s*/s',
+                    "\n                ",
+                    $content
+                );
+
+                // 3a: contribute our reports to the menu configuration dropdown,
+                // injected just before get_reports_choices() returns
+                if (strpos($content, 'unitas_ext_menu_reports_choices') === false) {
+                    $choices_shim = 'if(function_exists(\'unitas_ext_menu_reports_choices\')) $choices = unitas_ext_menu_reports_choices($choices);';
+                    $content = preg_replace(
+                        '/(return\s+\$choices;\s*\}\s*static\s+function\s+get_reports_types)/',
+                        $choices_shim . "\n\n        \$1",
+                        $content,
+                        1
+                    );
+                }
+
+                // 3b: hand the whole saved list to the plugin at the TOP of
+                // build_menu, before core loops it. Anchoring on the function
+                // signature avoids any dependence on the switch contents or on
+                // core matching our prefixes with strstr / str_replace.
+                $build_shim = 'if(function_exists(\'unitas_ext_menu_build_item\')) $sub_menu = unitas_ext_menu_build_item($reports_list, $sub_menu);';
+                $content = preg_replace(
+                    '/(static\s+function\s+build_menu\s*\(\s*\$reports_list\s*,\s*\$sub_menu\s*\)\s*\{\s*global\s+\$app_user;)/',
+                    "\$1\n\n        " . $build_shim,
+                    $content,
+                    1
+                );
+
+                if ($content !== null
+                    && strpos($content, 'unitas_ext_menu_build_item($reports_list') !== false
+                    && strpos($content, 'unitas_ext_menu_reports_choices') !== false) {
+                    if (file_put_contents($menu_file, $content) !== false) {
+                        $results['patched'][] = 'entities_menu.php';
+                    } else {
+                        $results['errors'][] = 'entities_menu.php (write failed — check file permissions)';
+                    }
+                } else {
+                    $results['errors'][] = 'entities_menu.php (anchor not found — manual patch needed)';
+                }
+            } else {
+                $results['skipped'][] = 'entities_menu.php (already patched)';
+            }
+        } else {
+            $results['errors'][] = 'entities_menu.php (file not found)';
         }
 
         return $results;
