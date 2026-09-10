@@ -285,31 +285,12 @@ class fieldtype_unitas_geometry
             return ($data && isset($data['encoded_polyline'])) ? $data['encoded_polyline'] : $options['value'];
         }
 
-        if (isset($options['is_listing'])) {
-            $data = json_decode($options['value'], true);
-            if (!$data || !isset($data['type'])) return '';
-            switch ($data['type']) {
-                case 'polyline':
-                    if (!empty($data['distance_m'])) {
-                        $d = $data['distance_m'];
-                        return ($d >= 1609) ? round($d / 1609.34, 1) . ' mi' : round($d * 3.28084) . ' ft';
-                    }
-                    return isset($data['points']) ? count($data['points']) . ' pts' : '';
-                case 'polygon':
-                    if (!empty($data['area_sqm'])) {
-                        $acres = $data['area_sqm'] / 4046.86;
-                        return $acres >= 640 ? round($acres / 640, 1) . ' sq mi' : round($acres, 1) . ' ac';
-                    }
-                    return isset($data['points']) ? 'Polygon (' . count($data['points']) . ' pts)' : 'Polygon';
-                case 'circle':
-                    if (!empty($data['radius_m'])) {
-                        $r = $data['radius_m'];
-                        return ($r >= 1609) ? round($r / 1609.34, 1) . ' mi radius' : round($r * 3.28084) . ' ft radius';
-                    }
-                    return 'Circle';
-                default:
-                    return '';
-            }
+        // is_email reuses the plain-text listing summary so notification emails
+        // never contain map markup or scripts. This is required now that the
+        // legacy patch which excluded geometry from emails has been retired
+        // (see install.php::retire_legacy_patches, plan section 6.5).
+        if (isset($options['is_listing']) || isset($options['is_email'])) {
+            return self::listing_summary($options['value']);
         }
 
         if (empty($options['value'])) return '';
@@ -572,11 +553,42 @@ class fieldtype_unitas_geometry
 
     private static function get_map_config()
     {
-        static $cache = null;
-        if ($cache !== null) return $cache;
-        $q = db_query("SELECT * FROM app_unitas_map_reports_config LIMIT 1");
-        $cache = db_fetch_array($q);
-        if (!$cache) $cache = array('google_map_api_key' => '', 'default_lat' => '35.7596', 'default_lng' => '-79.0193', 'default_zoom' => 8, 'waze_geocoding_token' => '', 'waze_region' => 'na');
-        return $cache;
+        // Consolidated onto the shared config helper (plan section 7.1) so there
+        // is a single source of map defaults. The helper is a module file that
+        // is not auto-loaded in every context, so require it defensively.
+        require_once __DIR__ . '/../../modules/map_configuration/helpers/map_config.php';
+        return unitas_map_config::get();
+    }
+
+    /**
+     * Plain-text summary of a stored geometry value, used for both the listing
+     * column and notification emails (no markup, no scripts).
+     */
+    private static function listing_summary($value)
+    {
+        $data = json_decode($value, true);
+        if (!$data || !isset($data['type'])) return '';
+        switch ($data['type']) {
+            case 'polyline':
+                if (!empty($data['distance_m'])) {
+                    $d = $data['distance_m'];
+                    return ($d >= 1609) ? round($d / 1609.34, 1) . ' mi' : round($d * 3.28084) . ' ft';
+                }
+                return isset($data['points']) ? count($data['points']) . ' pts' : '';
+            case 'polygon':
+                if (!empty($data['area_sqm'])) {
+                    $acres = $data['area_sqm'] / 4046.86;
+                    return $acres >= 640 ? round($acres / 640, 1) . ' sq mi' : round($acres, 1) . ' ac';
+                }
+                return isset($data['points']) ? 'Polygon (' . count($data['points']) . ' pts)' : 'Polygon';
+            case 'circle':
+                if (!empty($data['radius_m'])) {
+                    $r = $data['radius_m'];
+                    return ($r >= 1609) ? round($r / 1609.34, 1) . ' mi radius' : round($r * 3.28084) . ' ft radius';
+                }
+                return 'Circle';
+            default:
+                return '';
+        }
     }
 }
