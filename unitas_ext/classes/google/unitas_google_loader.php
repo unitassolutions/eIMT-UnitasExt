@@ -80,7 +80,9 @@ class unitas_google_loader
             $center = array('lat' => (float)$cfg['default_lat'], 'lng' => (float)$cfg['default_lng']);
         }
 
-        $pin_url = function_exists('url_for') ? url_for('unitas_ext/location/pin') : '';
+        // action=save makes the global CSRF check enforce the token that
+        // url_for() appends, and lets pin.php be reached as a plugin action.
+        $pin_url = function_exists('url_for') ? url_for('unitas_ext/location/pin', 'action=save') : '';
 
         return array(
             'browserKey'   => $key,

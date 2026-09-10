@@ -164,15 +164,50 @@
         this.marker = null;
     };
 
-    // Manual pin: keep the current source address, mark as manually placed.
-    // Ignored when the address is empty (P13).
+    // Manual pin. In a form it writes the hidden value; on the item page it
+    // POSTs to the pin endpoint (which re-checks access) and reverts on failure.
+    // Ignored when the address is empty (P13) in the form.
     Field.prototype.onManualPlace = function (lat, lng) {
-        var addr = this.source ? normalizeAddress(this.source.value) : this.value.address;
-        if (!addr) return;
-        this.value = { lat: lat, lng: lng, address: addr, status: 'manual' };
-        this.hidden.value = fmt(lat, lng, addr, 'manual');
-        this.setStatus((this.cfg.strings || {}).manual, 'text-muted');
-        this.placeMarker(lat, lng, false);
+        if (this.hidden) {
+            var addr = this.source ? normalizeAddress(this.source.value) : this.value.address;
+            if (!addr) return;
+            this.value = { lat: lat, lng: lng, address: addr, status: 'manual' };
+            this.hidden.value = fmt(lat, lng, addr, 'manual');
+            this.setStatus((this.cfg.strings || {}).manual, 'text-muted');
+            this.placeMarker(lat, lng, false);
+            return;
+        }
+        this.pinPost(lat, lng);
+    };
+
+    Field.prototype.pinPost = function (lat, lng) {
+        var self = this;
+        var url = (window.UNITAS_GMAPS && window.UNITAS_GMAPS.pinUrl) || '';
+        if (!url || !this.cfg.path) return;
+
+        var prev = (this.value.lat != null) ? { lat: this.value.lat, lng: this.value.lng } : null;
+        var body = new URLSearchParams();
+        body.set('path', this.cfg.path);
+        body.set('field_id', this.cfg.fieldId);
+        body.set('lat', lat);
+        body.set('lng', lng);
+
+        fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: body })
+            .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
+            .then(function (d) {
+                if (d && d.ok) {
+                    self.value = { lat: lat, lng: lng, address: self.value.address, status: 'manual' };
+                    self.placeMarker(lat, lng, false);
+                    self.setStatus((self.cfg.strings || {}).manual, 'text-muted');
+                } else {
+                    if (prev) self.placeMarker(prev.lat, prev.lng, false); else self.hideMarker();
+                    self.setStatus((d && d.error) ? d.error : 'Could not save pin.', 'text-danger');
+                }
+            })
+            .catch(function () {
+                if (prev) self.placeMarker(prev.lat, prev.lng, false); else self.hideMarker();
+                self.setStatus('Could not save pin.', 'text-danger');
+            });
     };
 
     function init(cfg) {

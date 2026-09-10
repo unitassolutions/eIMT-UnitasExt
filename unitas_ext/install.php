@@ -284,6 +284,35 @@ CREATE TABLE IF NOT EXISTS `app_unitas_address_autocomplete_rules` (
         }
     }
 
+    /**
+     * Whether any core Google map fields still exist (P12). Cached in
+     * app_configuration so the check runs once, not on every request; the
+     * cached constant is loaded by core at bootstrap on subsequent requests.
+     * The migration tool and location tools page call refresh_core_gmap_flag()
+     * to update it.
+     */
+    static function core_gmap_fields_present()
+    {
+        if (defined('CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT')) {
+            return CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT === '1';
+        }
+        // Not cached yet: compute now, store for next request, use this value now.
+        return self::refresh_core_gmap_flag();
+    }
+
+    /**
+     * Recompute and store the core-Google-map-fields presence flag.
+     * @return bool present
+     */
+    static function refresh_core_gmap_flag()
+    {
+        $q = db_query("select count(*) as n from app_fields where type in ('fieldtype_google_map','fieldtype_google_map_directions','fieldtype_google_map_nested')");
+        $r = db_fetch_array($q);
+        $present = ($r && (int)$r['n'] > 0);
+        self::set_config('CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT', $present ? '1' : '0');
+        return $present;
+    }
+
     // ── Core File Patching ──────────────────────────────────────────────────
 
     /**

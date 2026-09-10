@@ -25,7 +25,8 @@ $is_ajax_request = (
     (isset($_POST['is_modal']) && $_POST['is_modal'] == 1) ||
     (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/entity_buttons/ajax_get_buttons') ||
     (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/ajax_reverse_geocode') ||
-    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/public')
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/public') ||
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/location/pin')
 );
 
 // ── Installation Check ──────────────────────────────────────────────────────
@@ -52,6 +53,17 @@ if (!unitas_ext_installer::is_installed() && !$is_ajax_request) {
 // If installed but DB version is behind plugin version, run migrations silently.
 if (unitas_ext_installer::is_installed() && unitas_ext_installer::needs_upgrade() && !$is_ajax_request) {
     unitas_ext_installer::upgrade();
+}
+
+// ── Block the vulnerable core items/google_map endpoint (P12) ────────────────
+// Once no core Google map fields remain, core update_latlng / save_value_in
+// have no legitimate use and carry an unauthorized-write + stored-XSS path.
+// The presence flag is cached in app_configuration and refreshed by migration.
+if ($current_module === 'items/google_map'
+    && unitas_ext_installer::is_installed()
+    && !unitas_ext_installer::core_gmap_fields_present()) {
+    http_response_code(403);
+    exit();
 }
 
 // Load entity buttons class (tables are guaranteed to exist after install)

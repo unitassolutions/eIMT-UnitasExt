@@ -268,12 +268,25 @@ class fieldtype_unitas_location
         if (!strstr($w, '%') && !strstr($w, 'px')) $w .= 'px';
         if (!strstr($h, '%') && !strstr($h, 'px')) $h .= 'px';
 
+        // Interactive drag/click is enabled only on the item page for this
+        // record when the viewer has update access. The pin endpoint re-checks
+        // everything, so this only governs UX; it never grants access.
+        global $current_entity_id, $current_item_id, $current_path;
+        $field_entity = (int)(isset($field['entities_id']) ? $field['entities_id'] : 0);
+        $can_edit = false;
+        $path = '';
+        if (isset($current_entity_id) && (int)$current_entity_id === $field_entity && !empty($current_item_id)) {
+            $path = (isset($current_path) && $current_path) ? $current_path : ($current_entity_id . '-' . $current_item_id);
+            $can_edit = users::has_access('update');
+        }
+
         $init = json_encode(array(
             'fieldId'       => $fid,
             'value'         => $p,
-            'canEdit'       => false, // interactive item-page editing added next increment
+            'canEdit'       => $can_edit,
             'preview'       => true,
-            'readonly'      => true,
+            'readonly'      => !$can_edit,
+            'path'          => $path,
             'zoom'          => (int)($cfg->get('zoom') ?: 16),
             'mapId'         => self::resolve_map_id($map_cfg),
             'defaultCenter' => self::default_center($map_cfg),
