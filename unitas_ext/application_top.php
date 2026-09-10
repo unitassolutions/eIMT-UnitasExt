@@ -11,7 +11,7 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.5.2');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.6.0');
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
 // Load installer
