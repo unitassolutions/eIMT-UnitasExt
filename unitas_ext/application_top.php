@@ -206,6 +206,23 @@ if (isset($app_user['id']) && $app_user['id'] > 0) {
         '<script src="plugins/unitas_ext/js/heic/heic_converter.js"></script>' . "\n";
 }
 
+// Address Autocomplete: inject the shared Maps loader, the field id list, and
+// the widget on non-AJAX pages when there is at least one field to attach to
+// and a browser key is configured. The widget uses a delegated focusin
+// listener, so AJAX-loaded modal forms are covered by the parent page's script.
+if (!$is_ajax_request && unitas_ext_installer::is_installed()) {
+    require_once PLUGIN_UNITAS_EXT_PATH . '/classes/location/unitas_address_autocomplete_rules.php';
+    require_once PLUGIN_UNITAS_EXT_PATH . '/classes/google/unitas_google_loader.php';
+
+    $unitas_ac_field_ids = unitas_address_autocomplete_rules::field_ids();
+    if ($unitas_ac_field_ids && unitas_google_keys::browser() !== '') {
+        $unitas_inject_html .= "\n<!-- Unitas Extension: Address Autocomplete -->\n"
+            . unitas_google_loader::emit()
+            . '<script>window.UNITAS_AUTOCOMPLETE_FIELDS = ' . json_encode(array_map('intval', $unitas_ac_field_ids)) . ';</script>' . "\n"
+            . '<script src="plugins/unitas_ext/js/google/unitas_address_autocomplete.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '"></script>' . "\n";
+    }
+}
+
 // Lightbox Embed Mode: Hide sidebar, header, footer when loaded inside a lightbox iframe.
 // This fires on the PAGE INSIDE THE IFRAME, not the parent page.
 if (isset($_GET['is_modal']) || isset($_GET['is_embed'])) {

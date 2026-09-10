@@ -242,6 +242,20 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
         if (!self::column_exists('app_unitas_map_reports_config', 'geocode_last_error_at')) {
             db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN geocode_last_error_at datetime NULL DEFAULT NULL AFTER geocode_last_error");
         }
+
+        // v1.6.0: standalone address autocomplete rules (attach Places autocomplete
+        // to a plain text field). Safe/idempotent via IF NOT EXISTS.
+        db_query("
+CREATE TABLE IF NOT EXISTS `app_unitas_address_autocomplete_rules` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `entities_id` int(10) UNSIGNED NOT NULL,
+  `fields_id` int(10) UNSIGNED NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `notes` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fields_id` (`fields_id`),
+  KEY `idx_entities_id` (`entities_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 
     /**
