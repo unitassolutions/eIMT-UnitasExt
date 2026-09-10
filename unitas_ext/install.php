@@ -22,7 +22,7 @@ class unitas_ext_installer
     }
 
     /**
-     * Get the currently installed DB schema version.
+     * Get the currently installed plugin version.
      */
     static function get_db_version()
     {
@@ -30,6 +30,27 @@ class unitas_ext_installer
             return CFG_PLUGIN_UNITAS_EXT_DB_VERSION;
         }
         return '0.0.0';
+    }
+
+    /**
+     * Schema version the code expects (integer, bumped per migration batch).
+     * Independent of the plugin's semantic version so that several commits
+     * sharing one plugin version each still trigger their own migrations.
+     */
+    static function schema_version()
+    {
+        return defined('PLUGIN_UNITAS_EXT_SCHEMA_VERSION') ? (int)PLUGIN_UNITAS_EXT_SCHEMA_VERSION : 0;
+    }
+
+    /**
+     * Schema version currently recorded in the database.
+     */
+    static function get_db_schema_version()
+    {
+        if (defined('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION')) {
+            return (int)CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION;
+        }
+        return 0;
     }
 
     /**
@@ -49,26 +70,32 @@ class unitas_ext_installer
         // Mark as installed
         self::set_config('CFG_PLUGIN_UNITAS_EXT_INSTALLED', '1');
         self::set_config('CFG_PLUGIN_UNITAS_EXT_DB_VERSION', PLUGIN_UNITAS_EXT_VERSION);
+        self::set_config('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION', (string)self::schema_version());
 
         return true;
     }
 
     /**
-     * Run migrations for version upgrades.
+     * Run migrations for version and/or schema upgrades. run_migrations() is
+     * fully idempotent, so re-running it is safe.
      */
     static function upgrade()
     {
         self::run_migrations();
         self::patch_core_files();
         self::set_config('CFG_PLUGIN_UNITAS_EXT_DB_VERSION', PLUGIN_UNITAS_EXT_VERSION);
+        self::set_config('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION', (string)self::schema_version());
     }
 
     /**
-     * Check if upgrade is needed (plugin version > DB version).
+     * Upgrade is needed when the plugin version advanced OR the schema version
+     * advanced. The schema check catches new migrations added under an
+     * unchanged plugin version.
      */
     static function needs_upgrade()
     {
-        return version_compare(PLUGIN_UNITAS_EXT_VERSION, self::get_db_version(), '>');
+        return version_compare(PLUGIN_UNITAS_EXT_VERSION, self::get_db_version(), '>')
+            || (self::schema_version() > self::get_db_schema_version());
     }
 
     /**

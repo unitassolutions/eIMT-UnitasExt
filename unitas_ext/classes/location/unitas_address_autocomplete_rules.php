@@ -15,6 +15,22 @@ class unitas_address_autocomplete_rules
     /** Per-request cache of the resolved, validated field id list. */
     private static $ids_cache = null;
 
+    /** Per-request cache of whether the rules table exists. */
+    private static $table_ok = null;
+
+    /**
+     * Whether the rules table exists. Guards every query against a missing
+     * table (e.g. a migration that has not yet run) so a plugin sub-feature
+     * can never take down the whole application. Cached per request.
+     */
+    private static function table_ready()
+    {
+        if (self::$table_ok !== null) return self::$table_ok;
+        $r = db_query("SHOW TABLES LIKE 'app_unitas_address_autocomplete_rules'");
+        self::$table_ok = ($r && db_num_rows($r) > 0);
+        return self::$table_ok;
+    }
+
     /**
      * Field ids that should get the autocomplete widget.
      * @return int[]
@@ -25,10 +41,12 @@ class unitas_address_autocomplete_rules
 
         $candidates = array();
 
-        // 1. Active standalone rules.
-        $q = db_query("select fields_id from app_unitas_address_autocomplete_rules where is_active = 1");
-        while ($r = db_fetch_array($q)) {
-            $candidates[(int)$r['fields_id']] = true;
+        // 1. Active standalone rules (skipped if the table is not present yet).
+        if (self::table_ready()) {
+            $q = db_query("select fields_id from app_unitas_address_autocomplete_rules where is_active = 1");
+            while ($r = db_fetch_array($q)) {
+                $candidates[(int)$r['fields_id']] = true;
+            }
         }
 
         // 2. Location fields with autocomplete enabled -> their source text field.
@@ -81,6 +99,8 @@ class unitas_address_autocomplete_rules
      */
     public static function all_rules()
     {
+        if (!self::table_ready()) return array();
+
         $rows = array();
         $q = db_query(
             "select r.*, f.name as field_name, f.type as field_type, e.name as entity_name " .
