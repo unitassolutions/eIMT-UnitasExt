@@ -539,6 +539,22 @@
     border-radius: 8px;
 }
 
+/* Selected filter value(s): the filter widget is select2, whose default theme
+   renders the chosen value in a muted gray (#444 for a single select, inherited
+   for a multi-select pill) that reads as washed-out next to the near-black open
+   dropdown options. Darken it to the v2 card ink so the active selection is
+   legible. The placeholder (.select2-selection__placeholder, #999) is left
+   alone so an unset filter still reads as a hint. These elements live in the
+   select2 container inside the filter card; the dropdown menu itself is
+   appended to <body> and keeps its own dark option text. The select2 control
+   keeps a white background in both themes, so dark text stays readable in dark
+   mode too. Specificity (0,4,0 / 0,3,0) beats select2 default without a
+   !important. */
+.unitas-pmv2-filters .select2-container--default .select2-selection--single .select2-selection__rendered,
+.unitas-pmv2-filters .select2-selection--multiple .select2-selection__choice {
+    color: #26303b;
+}
+
 /* On narrower screens the card returns to the normal flow above the map */
 @media (max-width: 1250px) {
     .unitas-pmv2-filters {

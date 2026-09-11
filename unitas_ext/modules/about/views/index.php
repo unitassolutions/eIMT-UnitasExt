@@ -92,6 +92,11 @@
             </div>
             <div class="panel-body">
                 <ul>
+                    <li><strong>Cleaner modern pivot map filters:</strong> Reports with no configured filter fields no longer show an empty filter bar floating over the top of the map.</li>
+                    <li><strong>Readable filter selections:</strong> The chosen value in a modern pivot map filter now renders in dark ink instead of a washed-out gray, while the "Select some options" placeholder stays a subtle hint.</li>
+                </ul>
+                <p style="margin-top:12px"><strong>Previously in v1.6.7 — Google Maps key lockdown</strong></p>
+                <ul>
                     <li><strong>Two-key Google configuration:</strong> A website-restricted browser key and a separate IP-restricted server key that never reaches the browser. Both keys have one-click tests on the Google Map page.</li>
                     <li><strong>Location field type:</strong> Replaces the core Google Map field with server-side geocoding, a draggable pin, and a geocoding status stored with every value.</li>
                     <li><strong>Address autocomplete:</strong> Google Places (New) suggestions on address fields, replacing the legacy Google Autocomplete smart input. Configurable per field under Extension Configuration.</li>
