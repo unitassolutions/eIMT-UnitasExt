@@ -227,6 +227,9 @@ Overrides:
 - Uses `??` null coalescing (PHP 7.0+)
 - Uses closures with `use` (PHP 5.3+)
 
+### Language Strings
+`languages/en.php` holds the original entity-buttons constants only. Every module since v1.2.0 uses hardcoded English in views, and v1.6.x follows that convention deliberately: the deployments are English-only county EOCs, and constants without a second language are pure indirection. Revisit only if a non-English deployment appears; until then, new UI text goes directly into views.
+
 ### Critical Safety Rules
 1. **Never use contractions in PHP single-quoted strings** — apostrophe terminates the string
 2. **Never set $app_layout in view actions** — causes HTTP 500

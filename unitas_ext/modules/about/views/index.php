@@ -68,6 +68,18 @@
                         <td><strong>Waze Integration</strong></td>
                         <td>Reverse-geocoding autofill of road and cross-street names when a closure is drawn on a geometry field, plus a keyed CIFS feed that publishes active closures to the Waze app.</td>
                     </tr>
+                    <tr>
+                        <td><strong>Location Field Type</strong></td>
+                        <td>Replacement for the core Google Map field: server-side geocoding of a companion address field, draggable pin preview, and a per-record geocoding status. Works with restricted Google API keys.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Address Autocomplete</strong></td>
+                        <td>Google Places (New) address suggestions on location source fields and on any text field via autocomplete rules. Replaces the legacy Google Autocomplete smart input.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Location Tools</strong></td>
+                        <td>Migration of core Google Map fields to the Location type, batch re-geocoding, and a location health triage view.</td>
+                    </tr>
                 </table>
             </div>
         </div>
@@ -80,11 +92,11 @@
             </div>
             <div class="panel-body">
                 <ul>
-                    <li><strong>Modern pivot map layout:</strong> Each pivot map report can switch to a modern full-bleed layout with floating panels. Classic reports are unchanged.</li>
-                    <li><strong>Interactive legend:</strong> The legend is now a floating card with per-layer counts and show/hide toggles for each layer.</li>
-                    <li><strong>Searchable sidebar:</strong> A floating, collapsible object list with live search and status-color pills. Clicking an item zooms to it and opens its popup.</li>
-                    <li><strong>Colored pins:</strong> Layers with a marker color and no custom icon now render colored map pins in the modern layout.</li>
-                    <li><strong>Dark mode:</strong> The modern panels restyle automatically when the map theme is dark.</li>
+                    <li><strong>Two-key Google configuration:</strong> A website-restricted browser key and a separate IP-restricted server key that never reaches the browser. Both keys have one-click tests on the Google Map page.</li>
+                    <li><strong>Location field type:</strong> Replaces the core Google Map field with server-side geocoding, a draggable pin, and a geocoding status stored with every value.</li>
+                    <li><strong>Address autocomplete:</strong> Google Places (New) suggestions on address fields, replacing the legacy Google Autocomplete smart input. Configurable per field under Extension Configuration.</li>
+                    <li><strong>Location Tools:</strong> One-click migration of existing Google Map fields, batch re-geocoding, and a location health view for finding records that need attention.</li>
+                    <li><strong>Self-repairing core integration:</strong> Core changes are applied as managed shims with a health check and an admin banner after Rukovoditel core updates.</li>
                 </ul>
             </div>
         </div>
