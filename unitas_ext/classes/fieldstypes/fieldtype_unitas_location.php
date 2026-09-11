@@ -167,12 +167,19 @@ class fieldtype_unitas_location
             if (isset($sf['type']) && $sf['type'] === 'fieldtype_input') {
                 require_once __DIR__ . '/../location/unitas_address_autocomplete_rules.php';
                 $html .= unitas_address_autocomplete_rules::emit_assets(array($src_id));
+                // Attach to EVERY element with this id (a modal form over a
+                // listing can duplicate fields_{id}; getElementById would pick
+                // the wrong one), and never give up silently.
                 $html .= '<script>'
                        . '(function(){var tries=0;'
                        . 'function a(){'
-                       . 'var el=document.getElementById("fields_' . (int)$src_id . '");'
-                       . 'if(el&&window.UnitasAddressAutocomplete){window.UnitasAddressAutocomplete.attach(el);return;}'
-                       . 'if(++tries<50)setTimeout(a,100);'
+                       . 'var els=document.querySelectorAll(\'[id="fields_' . (int)$src_id . '"]\');'
+                       . 'if(els.length&&window.UnitasAddressAutocomplete){'
+                       . 'for(var i=0;i<els.length;i++){window.UnitasAddressAutocomplete.attach(els[i]);}'
+                       . 'return;'
+                       . '}'
+                       . 'if(++tries<50){setTimeout(a,100);}'
+                       . 'else{try{console.warn("[unitas-autocomplete] attach gave up for fields_' . (int)$src_id . ': input "+(els.length?"found":"MISSING")+", widget "+(window.UnitasAddressAutocomplete?"loaded":"MISSING"));}catch(e){}}'
                        . '}'
                        . 'a();'
                        . '})();'

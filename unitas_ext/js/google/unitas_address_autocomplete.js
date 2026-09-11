@@ -106,6 +106,11 @@
     Controller.prototype.onInput = function () {
         if (this.programmatic) return; // our own write, not a user edit
 
+        if (!this._sawInput) {
+            this._sawInput = true;
+            info('input events flowing on #' + this.input.id);
+        }
+
         // Signal an edit burst once so a bound location field can clear itself.
         if (!this.editBurst) {
             this.editBurst = true;
@@ -141,6 +146,7 @@
         }).then(function (res) {
             if (mySeq !== self.seq) return; // stale response, a newer query exists
             var list = (res && res.suggestions) ? res.suggestions : [];
+            info(list.length + ' suggestion(s) for "' + value + '"');
             self.render(list.slice(0, MAX_SUGGESTIONS));
         }).catch(function (err) {
             self.close();
@@ -288,10 +294,17 @@
         window.removeEventListener('resize', this.reposition);
     };
 
+    function info(msg) {
+        try { console.info('[unitas-autocomplete] ' + msg); } catch (e) {}
+    }
+
     function attach(input) {
         if (input.getAttribute('data-unitas-ac') === '1') return;
         input.setAttribute('data-unitas-ac', '1');
-        try { new Controller(input); } catch (err) { warnOnce('init failed', err); }
+        try {
+            new Controller(input);
+            info('attached to #' + input.id);
+        } catch (err) { warnOnce('init failed', err); }
     }
 
     // Delegated focusin so inputs added later (AJAX modal forms) are covered.
@@ -299,11 +312,16 @@
         if (eligible(e.target)) attach(e.target);
     });
 
-    // Attach to any already-present eligible inputs on load.
+    // Attach to any already-present eligible inputs on load. Attaches to EVERY
+    // element carrying the id (querySelectorAll, not getElementById): a page
+    // can end up with duplicate fields_{id} elements (a modal form over a
+    // listing), and getElementById would silently pick the wrong one.
     function attachExisting() {
         activeFieldIds().forEach(function (id) {
-            var input = document.getElementById('fields_' + id);
-            if (input && eligible(input)) attach(input);
+            var els = document.querySelectorAll('[id="fields_' + id + '"]');
+            for (var i = 0; i < els.length; i++) {
+                if (eligible(els[i])) attach(els[i]);
+            }
         });
     }
     if (document.readyState === 'loading') {
@@ -311,6 +329,8 @@
     } else {
         attachExisting();
     }
+
+    info('widget loaded; active field ids: ' + JSON.stringify(activeFieldIds()));
 
     // rescan() is called after the field id list is appended to (e.g. a modal
     // rendered after the widget already loaded) to attach any present inputs.
