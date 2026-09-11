@@ -31,7 +31,15 @@ if($use_v2)
     // and receives the dark-mode class from the v2 JS. Filters stay OUTSIDE
     // the reload target so they survive fragment reloads.
     echo '<div class="unitas-pmv2-wrap">';
-    echo '<div class="unitas-pmv2-filters">' . unitas_pivot_map_reports::render_entity_filters_panel($reports) . '</div>';
+    // Only emit the floating filter card when the report actually has filter
+    // fields configured. render_entity_filters_panel() returns an empty string
+    // when there are none, and an empty wrapper still shows its padded card
+    // background as a stray bar floating over the top of the map.
+    $filters_html = unitas_pivot_map_reports::render_entity_filters_panel($reports);
+    if(trim($filters_html) !== '')
+    {
+        echo '<div class="unitas-pmv2-filters">' . $filters_html . '</div>';
+    }
     // v2 draws its own interactive legend inside the map shell
 }
 else

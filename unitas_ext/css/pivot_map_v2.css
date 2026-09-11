@@ -539,6 +539,18 @@
     border-radius: 8px;
 }
 
+/* The bootstrap-multiselect filter widget reuses one span for both the
+   "Select some options" placeholder and the selected value(s), and the theme
+   leaves that text a muted gray that is hard to read on the light card. Force
+   the same dark ink the open dropdown options already use so the active filter
+   selection is legible. The button keeps a light bootstrap background even in
+   dark mode (dark mode only restyles native select/input/.form-control), so
+   dark text stays readable in both themes. */
+.unitas-pmv2-filters .multiselect,
+.unitas-pmv2-filters .multiselect-selected-text {
+    color: #26303b !important;
+}
+
 /* On narrower screens the card returns to the normal flow above the map */
 @media (max-width: 1250px) {
     .unitas-pmv2-filters {
