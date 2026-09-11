@@ -236,7 +236,11 @@ class fieldtype_unitas_geometry
                . '      window._unitasGeoApiLoading=true;'
                . '      window._unitasGeoApiReady=function(){window._unitasGeoApiLoaded=true;(window._unitasGeoQueue||[]).forEach(function(fn){fn()});window._unitasGeoQueue=[]};'
                . '      var _gs=document.createElement("script");'
-               . '      _gs.src="' . htmlspecialchars($render_api_url) . '";'
+               // json_encode, NOT htmlspecialchars: inside an inline <script>
+               // block entities are never decoded, so an &amp; in the URL
+               // reaches Google literally and the callback parameter is lost
+               // (the callback then never fires and the map hangs silently).
+               . '      _gs.src=' . json_encode($render_api_url) . ';'
                . '      _gs.async=true;document.head.appendChild(_gs)'
                . '    }'
                . '  }'
@@ -385,7 +389,9 @@ class fieldtype_unitas_geometry
               . '      window._unitasGeoApiLoading=true;'
               . '      window._unitasGeoApiReady=function(){window._unitasGeoApiLoaded=true;(window._unitasGeoQueue||[]).forEach(function(fn){fn()});window._unitasGeoQueue=[]};'
               . '      var _s=document.createElement("script");'
-              . '      _s.src="' . htmlspecialchars($output_api_url) . '";'
+              // json_encode, NOT htmlspecialchars — see render(): an &amp; in
+              // inline script text is sent literally and kills the callback.
+              . '      _s.src=' . json_encode($output_api_url) . ';'
               . '      _s.async=true;document.head.appendChild(_s)'
               . '    }'
               . '  }'
