@@ -312,5 +312,7 @@
         attachExisting();
     }
 
-    window.UnitasAddressAutocomplete = { attach: attach };
+    // rescan() is called after the field id list is appended to (e.g. a modal
+    // rendered after the widget already loaded) to attach any present inputs.
+    window.UnitasAddressAutocomplete = { attach: attach, rescan: attachExisting };
 })();

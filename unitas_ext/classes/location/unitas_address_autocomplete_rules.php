@@ -92,6 +92,38 @@ class unitas_address_autocomplete_rules
     }
 
     /**
+     * Emit the browser assets that activate autocomplete on the given field
+     * ids: a script that appends the ids to window.UNITAS_AUTOCOMPLETE_FIELDS
+     * and (once per request) the widget script. Idempotent and safe to call
+     * from both the page injection and fieldtype_unitas_location::render(),
+     * which is how autocomplete works inside AJAX modal forms where the page
+     * injection is skipped. The loader (unitas_google_loader::emit) must be
+     * emitted separately.
+     *
+     * @param int[] $ids
+     * @return string HTML
+     */
+    public static function emit_assets(array $ids)
+    {
+        static $script_emitted = false;
+
+        $ids = array_values(array_unique(array_map('intval', array_filter($ids))));
+        if (!$ids) return '';
+
+        $html = '<script>window.UNITAS_AUTOCOMPLETE_FIELDS = (window.UNITAS_AUTOCOMPLETE_FIELDS || []);'
+              . json_encode($ids) . '.forEach(function(i){ if (window.UNITAS_AUTOCOMPLETE_FIELDS.indexOf(i) < 0) window.UNITAS_AUTOCOMPLETE_FIELDS.push(i); });'
+              . 'if (window.UnitasAddressAutocomplete && window.UnitasAddressAutocomplete.rescan) window.UnitasAddressAutocomplete.rescan();</script>';
+
+        if (!$script_emitted) {
+            $script_emitted = true;
+            $v = defined('PLUGIN_UNITAS_EXT_VERSION') ? PLUGIN_UNITAS_EXT_VERSION : '1.6.0';
+            $html .= '<script src="plugins/unitas_ext/js/google/unitas_address_autocomplete.js?v=' . rawurlencode($v) . '"></script>';
+        }
+
+        return $html;
+    }
+
+    /**
      * All standalone rules joined to field/entity names, for the admin list.
      * Rules whose field or entity no longer exists are still listed (flagged),
      * so the admin can clean them up.

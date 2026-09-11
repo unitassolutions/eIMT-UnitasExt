@@ -116,9 +116,38 @@
                     if (ll) self.onManualPlace(ll.lat, ll.lng);
                 });
             }
+
+            // A map created while its modal is hidden (height 0) renders blank;
+            // resize + recenter once the container first becomes visible.
+            self.fixSizeWhenVisible(center);
         }).catch(function (err) {
             try { console.warn('[unitas-location] map load failed', err); } catch (e) {}
         });
+    };
+
+    Field.prototype.fixSizeWhenVisible = function (center) {
+        var self = this;
+        this._sized = false;
+        function apply() {
+            if (!self.map || self._sized || !self.mapEl || self.mapEl.offsetHeight <= 0) return false;
+            self._sized = true;
+            try {
+                if (window.google && google.maps && google.maps.event) {
+                    google.maps.event.trigger(self.map, 'resize');
+                }
+                var c = (self.value.lat != null) ? { lat: self.value.lat, lng: self.value.lng } : center;
+                if (c) self.map.setCenter(c);
+            } catch (e) {}
+            return true;
+        }
+        if (apply()) return; // already visible
+        if (typeof ResizeObserver !== 'undefined') {
+            this._ro = new ResizeObserver(function () { if (apply() && self._ro) self._ro.disconnect(); });
+            this._ro.observe(this.mapEl);
+        } else {
+            var tries = 0;
+            var iv = setInterval(function () { if (apply() || ++tries > 30) clearInterval(iv); }, 150);
+        }
     };
 
     Field.prototype.placeMarker = function (lat, lng, recenter) {
@@ -212,10 +241,17 @@
 
     function init(cfg) {
         try {
-            if (!cfg || !document.getElementById('fields_' + cfg.fieldId)) return;
-            if (!window._unitasLocFields) window._unitasLocFields = {};
-            if (window._unitasLocFields[cfg.fieldId]) return; // once per field
-            window._unitasLocFields[cfg.fieldId] = new Field(cfg);
+            if (!cfg) return;
+            // Anchor the guard to the actual DOM element, not a page-level id
+            // cache, so a fresh modal DOM re-initializes (and a re-run on the
+            // same DOM does not double-init).
+            var anchor = document.getElementById('unitas_loc_map_' + cfg.fieldId)
+                      || document.getElementById('fields_' + cfg.fieldId)
+                      || document.getElementById('unitas_loc_status_' + cfg.fieldId);
+            if (!anchor) return;
+            if (anchor.getAttribute('data-unitas-loc-init') === '1') return;
+            anchor.setAttribute('data-unitas-loc-init', '1');
+            new Field(cfg);
         } catch (err) {
             try { console.warn('[unitas-location] init failed', err); } catch (e) {}
         }

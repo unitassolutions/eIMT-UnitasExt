@@ -155,20 +155,37 @@ class fieldtype_unitas_location
         ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
         $html .= unitas_google_loader::emit();
-        $html .= '<script>'
-               . '(function(){var c=' . $init . ';'
-               . 'function go(){window.UnitasLocation&&window.UnitasLocation.init(c);}'
-               . 'if(window.UnitasLocation){go();}else{'
-               . 'if(!window._unitasLocLoading){window._unitasLocLoading=true;'
-               . 'var s=document.createElement("script");'
-               . 's.src="plugins/unitas_ext/js/fieldtype/unitas_location.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '";'
-               . 's.onload=function(){window._unitasLocReady=true;(window._unitasLocQueue||[]).forEach(function(f){f()});window._unitasLocQueue=[];};'
-               . 'document.head.appendChild(s);}'
-               . 'window._unitasLocQueue=window._unitasLocQueue||[];window._unitasLocQueue.push(go);}'
-               . '})();'
-               . '</script>';
+
+        // Self-emit autocomplete on the bound source field, so it works inside
+        // AJAX modal forms where the page-level injection is skipped (plan 7.7).
+        if ($src_id > 0 && $cfg->get('enable_autocomplete') !== 'no') {
+            $sf = db_find('app_fields', $src_id);
+            if (isset($sf['type']) && $sf['type'] === 'fieldtype_input') {
+                require_once __DIR__ . '/../location/unitas_address_autocomplete_rules.php';
+                $html .= unitas_address_autocomplete_rules::emit_assets(array($src_id));
+            }
+        }
+
+        $html .= self::init_script($init);
 
         return $html;
+    }
+
+    /** Shared loader-and-init script for the form and item-page maps. */
+    private static function init_script($init)
+    {
+        return '<script>'
+             . '(function(){var c=' . $init . ';'
+             . 'function go(){window.UnitasLocation&&window.UnitasLocation.init(c);}'
+             . 'if(window.UnitasLocation){go();}else{'
+             . 'if(!window._unitasLocLoading){window._unitasLocLoading=true;'
+             . 'var s=document.createElement("script");'
+             . 's.src="plugins/unitas_ext/js/fieldtype/unitas_location.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '";'
+             . 's.onload=function(){window._unitasLocReady=true;(window._unitasLocQueue||[]).forEach(function(f){f()});window._unitasLocQueue=[];};'
+             . 'document.head.appendChild(s);}'
+             . 'window._unitasLocQueue=window._unitasLocQueue||[];window._unitasLocQueue.push(go);}'
+             . '})();'
+             . '</script>';
     }
 
     // ── Save-time processing (client hint only) ──────────────────────────────
@@ -295,18 +312,7 @@ class fieldtype_unitas_location
 
         $html .= '<div id="unitas_loc_map_' . $fid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
         $html .= unitas_google_loader::emit();
-        $html .= '<script>'
-               . '(function(){var c=' . $init . ';'
-               . 'function go(){window.UnitasLocation&&window.UnitasLocation.init(c);}'
-               . 'if(window.UnitasLocation){go();}else{'
-               . 'if(!window._unitasLocLoading){window._unitasLocLoading=true;'
-               . 'var s=document.createElement("script");'
-               . 's.src="plugins/unitas_ext/js/fieldtype/unitas_location.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '";'
-               . 's.onload=function(){window._unitasLocReady=true;(window._unitasLocQueue||[]).forEach(function(f){f()});window._unitasLocQueue=[];};'
-               . 'document.head.appendChild(s);}'
-               . 'window._unitasLocQueue=window._unitasLocQueue||[];window._unitasLocQueue.push(go);}'
-               . '})();'
-               . '</script>';
+        $html .= self::init_script($init);
 
         return $html;
     }

@@ -235,8 +235,7 @@ if (!$is_ajax_request && unitas_ext_installer::is_installed()) {
     if ($unitas_ac_field_ids && unitas_google_keys::browser() !== '') {
         $unitas_inject_html .= "\n<!-- Unitas Extension: Address Autocomplete -->\n"
             . unitas_google_loader::emit()
-            . '<script>window.UNITAS_AUTOCOMPLETE_FIELDS = ' . json_encode(array_map('intval', $unitas_ac_field_ids)) . ';</script>' . "\n"
-            . '<script src="plugins/unitas_ext/js/google/unitas_address_autocomplete.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '"></script>' . "\n";
+            . unitas_address_autocomplete_rules::emit_assets($unitas_ac_field_ids) . "\n";
     }
 }
 
