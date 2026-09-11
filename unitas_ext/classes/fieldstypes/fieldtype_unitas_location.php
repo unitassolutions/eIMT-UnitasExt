@@ -130,10 +130,12 @@ class fieldtype_unitas_location
         $html .= '<input type="hidden" name="fields[' . $fid . ']" id="fields_' . $fid . '" value="'
               . htmlspecialchars($raw, ENT_QUOTES) . '">';
 
-        $html .= '<div id="unitas_loc_status_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-status" aria-live="polite"></div>';
+        $html .= '<div id="unitas_loc_status_' . $uid . '" class="unitas-loc-status" aria-live="polite">'
+              . htmlspecialchars(self::initial_status_text($parsed['status']))
+              . '</div>';
 
         if ($preview) {
-            $html .= '<div id="unitas_loc_map_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
+            $html .= '<div id="unitas_loc_map_' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
         } elseif ($api_key === '') {
             $html .= '<em class="text-muted">Map preview unavailable (no browser key).</em>';
         } else {
@@ -148,19 +150,6 @@ class fieldtype_unitas_location
         if ($api_key === '') {
             return $html; // no key: field still stores its value, just no map/JS
         }
-
-        $init = json_encode(array(
-            'fieldId'       => $fid,
-            'uid'           => $uid,
-            'sourceFieldId' => $src_id,
-            'value'         => $parsed,
-            'canEdit'       => true,
-            'preview'       => $preview,
-            'zoom'          => (int)($cfg->get('zoom') ?: 16),
-            'mapId'         => self::resolve_map_id($map_cfg),
-            'defaultCenter' => self::default_center($map_cfg),
-            'strings'       => self::status_strings(),
-        ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
         $html .= unitas_google_loader::emit();
 
@@ -195,26 +184,129 @@ class fieldtype_unitas_location
             }
         }
 
-        $html .= self::init_script($init);
+        $html .= self::map_widget_js($uid, $fid, $parsed, array(
+            'src_id'   => $src_id,
+            'is_form'  => true,
+            'can_edit' => true,
+            'path'     => '',
+            'pin_url'  => '',
+            'zoom'     => (int)($cfg->get('zoom') ?: 16),
+            'map_id'   => self::resolve_map_id($map_cfg),
+            'center'   => self::default_center($map_cfg),
+            'api_url'  => self::classic_api_url($api_key, $map_cfg),
+        ));
 
         return $html;
     }
 
-    /** Shared loader-and-init script for the form and item-page maps. */
-    private static function init_script($init)
+    /**
+     * Classic Maps JS URL, built exactly like the geometry field's (same
+     * callback and shared load flags, so the two coordinate).
+     */
+    private static function classic_api_url($api_key, $map_cfg)
     {
+        $map_ids_param = trim(($map_cfg['map_style_light'] ?? '') . ',' . ($map_cfg['map_style_dark'] ?? ''), ',');
+        return 'https://maps.googleapis.com/maps/api/js?key=' . $api_key
+             . ($map_ids_param ? '&map_ids=' . $map_ids_param : '')
+             . '&callback=_unitasGeoApiReady';
+    }
+
+    /** Initial status line text for a stored status (form status div). */
+    private static function initial_status_text($status)
+    {
+        $s = self::status_strings();
+        switch ($status) {
+            case 'approximate': return $s['approximate'];
+            case 'not_found':   return $s['notFound'];
+            case 'error':       return $s['error'];
+            case 'manual':      return $s['manual'];
+            default:            return '';
+        }
+    }
+
+    /**
+     * Inline, self-contained map widget for one rendered instance - the same
+     * methodology as the geometry field (which is proven in every context this
+     * app has): synchronous classic constructors, unconditional execution, no
+     * shared state between instances or opens, the shared _unitasGeoApi* load
+     * flags, and the readyState/window.load wrapper. Element ids carry the
+     * per-render $uid, so any number of copies of the field coexist on a page.
+     */
+    private static function map_widget_js($uid, $fid, $parsed, array $o)
+    {
+        $C = json_encode(array(
+            'uid'     => $uid,
+            'fieldId' => $fid,
+            'srcId'   => (int)$o['src_id'],
+            'lat'     => $parsed['lat'],
+            'lng'     => $parsed['lng'],
+            'isForm'  => (bool)$o['is_form'],
+            'canEdit' => (bool)$o['can_edit'],
+            'path'    => (string)$o['path'],
+            'pinUrl'  => (string)$o['pin_url'],
+            'zoom'    => (int)$o['zoom'],
+            'mapId'   => (string)$o['map_id'],
+            'center'  => $o['center'],
+            'apiUrl'  => (string)$o['api_url'],
+            'strings' => self::status_strings(),
+        ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+
         return '<script>'
-             . '(function(){var c=' . $init . ';'
-             . 'function go(){window.UnitasLocation&&window.UnitasLocation.init(c);}'
-             . 'if(window.UnitasLocation){go();}else{'
-             . 'if(!window._unitasLocLoading){window._unitasLocLoading=true;'
-             . 'var s=document.createElement("script");'
-             . 's.src="plugins/unitas_ext/js/fieldtype/unitas_location.js?v=' . rawurlencode(PLUGIN_UNITAS_EXT_VERSION) . '";'
-             . 's.onload=function(){window._unitasLocReady=true;(window._unitasLocQueue||[]).forEach(function(f){f()});window._unitasLocQueue=[];};'
-             . 'document.head.appendChild(s);}'
-             . 'window._unitasLocQueue=window._unitasLocQueue||[];window._unitasLocQueue.push(go);}'
-             . '})();'
-             . '</script>';
+            . '(function(){'
+            . 'var C=' . $C . ';'
+            . 'var map=null,marker=null;'
+            . 'function el(x){return document.getElementById(x);}'
+            . 'function statusMsg(t){var s=el("unitas_loc_status_"+C.uid);if(s){s.textContent=t||"";}}'
+            . 'function normalize(t){t=(t==null?"":String(t)).replace(/<[^>]*>/g," ").replace(/[\t\r\n]+/g," ").replace(/  +/g," ").trim();return t.length>500?t.slice(0,500):t;}'
+            . 'function cs(v){return String(Math.round(v*1e7)/1e7);}'
+            . 'function fmt(lat,lng,addr,st){var a=normalize(addr);var hp=(lat!=null&&lng!=null);if(!hp&&a===""&&st==="")return "";return (hp?cs(lat):"")+"\t"+(hp?cs(lng):"")+"\t"+a+"\t"+st;}'
+            // Form inputs resolved inside THIS instance own form, never by page-wide id.
+            . 'function formEl(){var s=el("unitas_loc_status_"+C.uid)||el("unitas_loc_map_"+C.uid);return (s&&s.closest)?s.closest("form"):null;}'
+            . 'function hiddenEl(){var f=formEl();return f?f.querySelector(\'[name="fields[\'+C.fieldId+\']"]\'):null;}'
+            . 'function sourceEl(){if(!C.srcId)return null;var f=formEl();var e=f?f.querySelector(\'[id="fields_\'+C.srcId+\'"]\'):null;return e||document.getElementById("fields_"+C.srcId);}'
+            . 'function place(lat,lng,center){if(!map)return;var p={lat:Number(lat),lng:Number(lng)};'
+            . 'if(marker){marker.setPosition(p);}'
+            . 'else{marker=new google.maps.Marker({map:map,position:p,draggable:!!C.canEdit});'
+            . 'if(C.canEdit){marker.addListener("dragend",function(){var q=marker.getPosition();manual(q.lat(),q.lng());});}}'
+            . 'if(center){map.setCenter(p);}}'
+            . 'function manual(lat,lng){'
+            . 'if(C.isForm){var s=sourceEl();var addr=normalize(s?s.value:"");if(!addr){return;}'
+            . 'var h=hiddenEl();if(h){h.value=fmt(lat,lng,addr,"manual");}'
+            . 'statusMsg(C.strings.manual);place(lat,lng,false);return;}'
+            . 'var prev=marker?marker.getPosition():null;'
+            . 'var b=new URLSearchParams();b.set("path",C.path);b.set("field_id",C.fieldId);b.set("lat",lat);b.set("lng",lng);'
+            . 'fetch(C.pinUrl,{method:"POST",headers:{"X-Requested-With":"XMLHttpRequest"},body:b})'
+            . '.then(function(r){return r.json().catch(function(){return {ok:false};});})'
+            . '.then(function(d){if(d&&d.ok){place(lat,lng,false);statusMsg(C.strings.manual);}'
+            . 'else{if(prev){place(prev.lat(),prev.lng(),false);}statusMsg((d&&d.error)?d.error:"Could not save pin.");}})'
+            . '.catch(function(){if(prev){place(prev.lat(),prev.lng(),false);}statusMsg("Could not save pin.");});}'
+            . 'function wireSource(){if(!C.isForm)return;var s=sourceEl();if(!s)return;'
+            . 'if(s.getAttribute("data-unitas-loc-"+C.uid)==="1")return;s.setAttribute("data-unitas-loc-"+C.uid,"1");'
+            . 's.addEventListener("unitas:address-selected",function(e){var d=e.detail||{};var h=hiddenEl();'
+            . 'if(h){h.value=fmt(d.lat,d.lng,d.address,"autocomplete");}statusMsg(C.strings.selected);'
+            . 'if(d.lat!=null){place(d.lat,d.lng,true);}});'
+            . 's.addEventListener("unitas:address-edited",function(){var h=hiddenEl();if(h){h.value="";}statusMsg(C.strings.willLookup);});}'
+            . 'function draw(){var m=el("unitas_loc_map_"+C.uid);'
+            . 'if(m){var o={zoom:C.zoom,center:(C.lat!=null?{lat:C.lat,lng:C.lng}:C.center)};'
+            . 'if(C.mapId){o.mapId=C.mapId;}else{o.mapTypeId="roadmap";}'
+            . 'map=new google.maps.Map(m,o);'
+            . 'if(C.lat!=null){place(C.lat,C.lng,false);}'
+            . 'if(C.canEdit){map.addListener("click",function(ev){manual(ev.latLng.lat(),ev.latLng.lng());});}}'
+            . 'wireSource();}'
+            // Identical load choreography to the geometry field.
+            . 'function init(){'
+            . 'if(window.google&&google.maps&&google.maps.Map){draw()}'
+            . 'else{'
+            . 'window._unitasGeoQueue=window._unitasGeoQueue||[];'
+            . 'window._unitasGeoQueue.push(draw);'
+            . 'if(!window._unitasGeoApiLoading){'
+            . 'window._unitasGeoApiLoading=true;'
+            . 'window._unitasGeoApiReady=function(){window._unitasGeoApiLoaded=true;(window._unitasGeoQueue||[]).forEach(function(fn){fn()});window._unitasGeoQueue=[]};'
+            . 'var sc=document.createElement("script");sc.src=' . json_encode((string)$o['api_url']) . ';sc.async=true;document.head.appendChild(sc);'
+            . '}}}'
+            . 'if(document.readyState==="complete"){init()}else{window.addEventListener("load",init)}'
+            . '})();'
+            . '</script>';
     }
 
     // ── Save-time processing (client hint only) ──────────────────────────────
@@ -327,26 +419,23 @@ class fieldtype_unitas_location
         }
 
         // Same per-instance uid scheme as render(): the info panel, info modal
-        // and stacked modals can each render this output on one page.
+        // and stacked modals can each render this output on one page, and each
+        // instance gets its own elements and its own inline widget.
         $uid = 'u' . substr(md5(uniqid((string)$fid, true)), 0, 10);
 
-        $init = json_encode(array(
-            'fieldId'       => $fid,
-            'uid'           => $uid,
-            'value'         => $p,
-            'canEdit'       => $can_edit,
-            'preview'       => true,
-            'readonly'      => !$can_edit,
-            'path'          => $path,
-            'zoom'          => (int)($cfg->get('zoom') ?: 16),
-            'mapId'         => self::resolve_map_id($map_cfg),
-            'defaultCenter' => self::default_center($map_cfg),
-            'strings'       => self::status_strings(),
-        ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-
-        $html .= '<div id="unitas_loc_map_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
-        $html .= unitas_google_loader::emit();
-        $html .= self::init_script($init);
+        $html .= '<div id="unitas_loc_status_' . $uid . '" class="unitas-loc-status" aria-live="polite"></div>';
+        $html .= '<div id="unitas_loc_map_' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
+        $html .= self::map_widget_js($uid, $fid, $p, array(
+            'src_id'   => 0,
+            'is_form'  => false,
+            'can_edit' => $can_edit,
+            'path'     => $path,
+            'pin_url'  => function_exists('url_for') ? url_for('unitas_ext/location/pin', 'action=save') : '',
+            'zoom'     => (int)($cfg->get('zoom') ?: 16),
+            'map_id'   => self::resolve_map_id($map_cfg),
+            'center'   => self::default_center($map_cfg),
+            'api_url'  => self::classic_api_url($api_key, $map_cfg),
+        ));
 
         return $html;
     }
