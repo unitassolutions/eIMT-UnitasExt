@@ -11,12 +11,12 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.6.6');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.6.7');
 // Schema version: bump by 1 whenever a migration is added, independent of the
 // plugin version above, so migrations added under an unchanged plugin version
 // still run. (v1 = the 1.6.0 key-lockdown schema: config columns + the address
-// autocomplete rules table.)
-define('PLUGIN_UNITAS_EXT_SCHEMA_VERSION', 1);
+// autocomplete rules table; v2 = the migration log table.)
+define('PLUGIN_UNITAS_EXT_SCHEMA_VERSION', 2);
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
 // Load installer

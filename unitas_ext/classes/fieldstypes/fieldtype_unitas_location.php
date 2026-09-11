@@ -483,10 +483,14 @@ class fieldtype_unitas_location
     }
 
     /**
-     * Per-record decision + write. Shared by the save hook and (Phase 5) the
+     * Per-record decision + write. Shared by the save hook and the Phase 5
      * re-geocode batch tool. Returns the resulting status code.
+     *
+     * @param string[] $retry_statuses settled statuses the caller wants looked
+     *        up again even though the stored address matches the source (the
+     *        re-geocode tool passes not_found / approximate when opted in)
      */
-    public static function process_record($entities_id, $items_id, $field, $item_info)
+    public static function process_record($entities_id, $items_id, $field, $item_info, $retry_statuses = array())
     {
         $cfg    = new fields_types_cfg($field['configuration']);
         $src_id = (int)$cfg->get('source_field_id');
@@ -504,9 +508,11 @@ class fieldtype_unitas_location
         }
 
         // No lookup when the stored address already matches the source and the
-        // status is settled (not_found is retried only when the address changes).
+        // status is settled (not_found is retried only when the address changes,
+        // or when the caller explicitly asks via $retry_statuses).
         $settled = array('autocomplete', 'geocoded', 'approximate', 'manual', 'not_found');
-        if ($stored['address'] === $source && in_array($stored['status'], $settled, true)) {
+        if ($stored['address'] === $source && in_array($stored['status'], $settled, true)
+            && !in_array($stored['status'], $retry_statuses, true)) {
             return $stored['status'];
         }
 

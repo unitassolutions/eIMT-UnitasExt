@@ -283,6 +283,20 @@ CREATE TABLE IF NOT EXISTS `app_unitas_address_autocomplete_rules` (
   UNIQUE KEY `uniq_fields_id` (`fields_id`),
   KEY `idx_entities_id` (`entities_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // v1.6.7 (schema 2): log of core Google map field conversions (plan 8.2).
+        db_query("
+CREATE TABLE IF NOT EXISTS `app_unitas_location_migration_log` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `fields_id` int(10) UNSIGNED NOT NULL,
+  `entities_id` int(10) UNSIGNED NOT NULL,
+  `converted_at` datetime NOT NULL,
+  `converted_by` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rows_rewritten` int(11) NOT NULL DEFAULT 0,
+  `notes` text NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_fields_id` (`fields_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 
     /**
