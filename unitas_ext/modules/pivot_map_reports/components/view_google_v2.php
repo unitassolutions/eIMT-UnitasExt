@@ -1,4 +1,5 @@
 <?php
+require_once PLUGIN_UNITAS_EXT_PATH . '/classes/google/unitas_google_keys.php';
 /**
  * UNITAS Extension — Pivot Map Report v2 (Modern layout) component
  *
@@ -23,7 +24,7 @@ if(!$reports_entities = db_fetch_array($reports_entities_query))
 
 /* GOOGLE MAP SCRIPT */
 $google_maps_js = 'https://maps.googleapis.com/maps/api/js'
-    . '?key=' . urlencode($map_cfg['google_map_api_key'])
+    . '?key=' . urlencode(unitas_google_keys::browser())
     . '&v=weekly'
     . '&map_ids=' . urlencode($map_cfg['map_style_light'] . ',' . $map_cfg['map_style_dark']);
 ?>
@@ -32,7 +33,7 @@ $google_maps_js = 'https://maps.googleapis.com/maps/api/js'
 <link rel="stylesheet" href="plugins/unitas_ext/css/pivot_map_v2.css?v=<?php echo PLUGIN_UNITAS_EXT_VERSION ?>">
 
 <script src="<?php echo $google_maps_js; ?>"></script>
-<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+<script src="plugins/unitas_ext/js/vendor/markerclusterer-2.5.3.min.js"></script>
 <script src="plugins/unitas_ext/js/pivot-map-v2.js?v=<?php echo PLUGIN_UNITAS_EXT_VERSION ?>"></script>
 
 <div id="unitas_pmv2_<?php echo (int)$reports['id'] ?>" class="unitas-pmv2-shell"></div>

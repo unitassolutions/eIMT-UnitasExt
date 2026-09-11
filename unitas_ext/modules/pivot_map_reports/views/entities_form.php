@@ -101,7 +101,7 @@ function check_field_type()
 {
 	field_id = $('#fields_id').val();
 	//alert(field_id)
-	if(fields_type_by_id[field_id]=='fieldtype_google_map' || fields_type_by_id[field_id]=='fieldtype_google_map_directions')
+	if(fields_type_by_id[field_id]=='fieldtype_google_map' || fields_type_by_id[field_id]=='fieldtype_google_map_directions' || fields_type_by_id[field_id]=='fieldtype_unitas_location')
 	{
 		/* Background Color drives the legend swatch and, in the v2 layout, the
 		   colored pins and sidebar status pills, so it applies to Google map

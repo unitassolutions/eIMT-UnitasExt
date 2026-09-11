@@ -716,6 +716,7 @@ class unitas_pivot_map_reports
                 case 'fieldtype_google_map':
                 case 'fieldtype_google_map_directions':
                 case 'fieldtype_unitas_geometry':
+                case 'fieldtype_unitas_location':
                     return "google";
                     break;
                 case 'fieldtype_mapbbcode':

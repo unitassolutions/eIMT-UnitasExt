@@ -104,13 +104,13 @@ switch($app_module_action)
                 $use_field_type = "'fieldtype_yandex_map'";
                 break;
             case 'google':
-                $use_field_type = "'fieldtype_google_map','fieldtype_google_map_directions','fieldtype_unitas_geometry'";
+                $use_field_type = "'fieldtype_google_map','fieldtype_google_map_directions','fieldtype_unitas_geometry','fieldtype_unitas_location'";
                 break;
             case 'mapbbcode':
                 $use_field_type = "'fieldtype_mapbbcode'";
                 break;
             default:
-                $use_field_type = "'fieldtype_mapbbcode','fieldtype_google_map','fieldtype_google_map_directions','fieldtype_yandex_map','fieldtype_unitas_geometry'";
+                $use_field_type = "'fieldtype_mapbbcode','fieldtype_google_map','fieldtype_google_map_directions','fieldtype_yandex_map','fieldtype_unitas_geometry','fieldtype_unitas_location'";
                 break;
         }
 
