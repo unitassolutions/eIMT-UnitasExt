@@ -22,16 +22,19 @@ class unitas_google_loader
      * been emitted this request. When no browser key is configured it returns
      * an admin-only warning instead (once), and nothing for other users.
      *
-     * Setting the core $is_google_map_script flag prevents any remaining core
-     * map field from loading a second copy of Maps JS on the same page.
+     * Deliberately does NOT set the core $is_google_map_script flag: our load
+     * is lazy (nothing loads until UnitasGMaps.load() is called), so claiming
+     * "Maps already loaded" would make core map fields and the Extension smart
+     * input skip their own script and break during coexistence. The browser
+     * loader detects an existing classic Maps script tag and reuses it, so
+     * both orders are safe without the flag.
      */
     public static function emit()
     {
         if (self::$emitted) return '';
         self::$emitted = true;
 
-        global $is_google_map_script, $app_user;
-        $is_google_map_script = true;
+        global $app_user;
 
         $key = unitas_google_keys::browser();
         if ($key === '') {

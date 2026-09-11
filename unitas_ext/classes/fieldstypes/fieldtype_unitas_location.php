@@ -158,11 +158,25 @@ class fieldtype_unitas_location
 
         // Self-emit autocomplete on the bound source field, so it works inside
         // AJAX modal forms where the page-level injection is skipped (plan 7.7).
+        // The direct attach mirrors how the Extension smart input wires its
+        // autocomplete: an inline per-field script emitted with the form HTML
+        // that targets #fields_{id} directly (no delegation dependency); the
+        // retry loop covers the widget script still loading in modal contexts.
         if ($src_id > 0 && $cfg->get('enable_autocomplete') !== 'no') {
             $sf = db_find('app_fields', $src_id);
             if (isset($sf['type']) && $sf['type'] === 'fieldtype_input') {
                 require_once __DIR__ . '/../location/unitas_address_autocomplete_rules.php';
                 $html .= unitas_address_autocomplete_rules::emit_assets(array($src_id));
+                $html .= '<script>'
+                       . '(function(){var tries=0;'
+                       . 'function a(){'
+                       . 'var el=document.getElementById("fields_' . (int)$src_id . '");'
+                       . 'if(el&&window.UnitasAddressAutocomplete){window.UnitasAddressAutocomplete.attach(el);return;}'
+                       . 'if(++tries<50)setTimeout(a,100);'
+                       . '}'
+                       . 'a();'
+                       . '})();'
+                       . '</script>';
             }
         }
 
