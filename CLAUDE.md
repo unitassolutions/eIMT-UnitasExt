@@ -6,7 +6,7 @@
 
 **Repo:** `https://github.com/unitassolutions/eIMT-UnitasExt`  
 **Plugin directory:** `plugins/unitas_ext/` inside a Rukovoditel installation  
-**Current version:** 1.5.0  
+**Current version:** 1.6.7 (schema version 2)  
 **Rukovoditel compatibility:** 3.5+ (tested on 3.6.4, 3.7)
 
 ### Deployment Instances
@@ -37,7 +37,8 @@ Rukovoditel is an open-source PHP project management platform using Bootstrap 3,
 - Listed in `includes/classes/fields_types.php::get_choices()` (hardcoded array, no plugin hook)
 - Each class has: `__construct()` (title), `get_configuration()`, `render()`, `process()`, `output()`
 - Unknown field types get `TEXT` column by default in `entities::prepare_field_type()`
-- Our plugin patches these two core files to register `fieldtype_unitas_geometry`
+- Core auto-loads a plugin's `application_core.php` (web/cron/REST) — our field type classes load there, no core `require` patch needed
+- Our installer injects marker-delimited shims into `fields_types.php` to register `fieldtype_unitas_geometry` + `fieldtype_unitas_location` (S1) and to hook item saves (S2) — see v1.6.x notes below
 
 ### Critical Rukovoditel CSS Classes (for lightbox embed mode)
 ```
@@ -59,7 +60,7 @@ Follows the Rukovoditel Extension pattern using `app_configuration` table:
 
 **Upgrades:** On each page load, `application_top.php` compares `PLUGIN_UNITAS_EXT_VERSION` vs `CFG_PLUGIN_UNITAS_EXT_DB_VERSION`. If plugin version is higher, `run_migrations()` fires silently — checks column existence before ALTER TABLE, re-applies core patches, updates DB version.
 
-**Core file patches:** The installer patches three Rukovoditel core files — two to register the geometry field type, one to expose Unitas map reports in the main Menu Configuration. These must be re-applied after Rukovoditel core updates. The install/upgrade page shows patch status.
+**Core file patches (v1.6.x form):** The installer manages marker-delimited shims in two Rukovoditel core files: `includes/classes/fields_types.php` (S1 `UNITAS_EXT_SHIM:field_types` — registers both Unitas field types via `unitas_ext_core_field_types()`; S2 `UNITAS_EXT_SHIM:update_items_fields` — save hook via `unitas_ext_core_update_items_fields()`) and `includes/classes/model/entities_menu.php` (menu shims A/B). A shim is applied only when its anchor occurs exactly once — otherwise the installer refuses and the anchor must be updated against the new core source. `shim_health()` drives a fixed admin banner after core updates; upgrades re-apply idempotently and auto-retire the old v1.1.0-style `application_core.php` require patch. Migrations key on an independent integer schema version (`PLUGIN_UNITAS_EXT_SCHEMA_VERSION` / `CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION`), not just the semantic version.
 
 ## Plugin File Structure
 
@@ -70,10 +71,21 @@ unitas_ext/
 ├── public_modules.php                           # No-login registration: CIFS feed + public map report actions
 ├── install.php                                  # Installer class: tables, migrations, core patching
 ├── readme.md
+├── application_core.php                         # Auto-loaded by core (web/cron/REST): core hooks + field type classes
 ├── classes/
 │   ├── EntityButtons.php                        # Entity button CRUD
+│   ├── core_hooks.php                           # Shim entry points (S1 field types, S2 save hook), all guarded
 │   ├── fieldstypes/
-│   │   └── fieldtype_unitas_geometry.php         # Custom geometry field type (polyline/polygon/circle + Waze autofill)
+│   │   ├── fieldtype_unitas_geometry.php         # Custom geometry field type (polyline/polygon/circle + Waze autofill)
+│   │   └── fieldtype_unitas_location.php         # Location field type (v1.6.x): geocode-on-save, pin preview, statuses
+│   ├── google/
+│   │   ├── unitas_google_keys.php               # Browser/server key resolver (constants override DB)
+│   │   ├── unitas_geocoder.php                  # Server-side Geocoding client (server key never in browser)
+│   │   └── unitas_google_loader.php             # Emits UNITAS_GMAPS config + classic loader once per request
+│   ├── location/
+│   │   ├── unitas_location_value.php            # 4-part value parse/format/validate
+│   │   ├── unitas_address_autocomplete_rules.php # Rules storage + page injection
+│   │   └── unitas_location_migration.php        # Preflight + convert + batched value rewrite
 │   └── map/
 │       ├── map_reports.php                      # Map report class
 │       ├── mind_map_reports.php                 # Mind map report class
@@ -87,6 +99,11 @@ unitas_ext/
 ├── js/
 │   ├── load-buttons.js                          # Entity button loader + report lightbox
 │   ├── pivot-map-v2.js                          # Pivot map v2 renderer (layers, legend, sidebar)
+│   ├── google/
+│   │   ├── unitas_gmaps_loader.js               # Classic Maps JS loader sharing geometry in-flight flags
+│   │   └── unitas_address_autocomplete.js       # Places (New) autocomplete widget (breadcrumb logging)
+│   ├── vendor/
+│   │   └── markerclusterer-2.5.3.min.js         # Pinned self-hosted clusterer (replaces unpkg)
 │   ├── fieldtype/
 │   │   └── unitas_geometry.js                   # Custom click-to-draw map widget + Waze street-name autofill
 │   └── heic/
@@ -98,6 +115,9 @@ unitas_ext/
 │   └── en.php
 └── modules/
     ├── about/                                   # About page (version, features, release notes)
+    ├── address_autocomplete/                    # Standalone autocomplete rules CRUD (v1.6.x)
+    ├── location/                                # actions/pin.php — secure pin-drag endpoint (v1.6.x)
+    ├── location_tools/                          # Migration / Re-geocode / Location Health (v1.6.x)
     ├── entity_buttons/                          # Custom buttons on entity listing pages
     │   ├── actions/
     │   │   ├── ajax_get_buttons.php              # AJAX endpoint: button HTML (button_type drives lightbox decision)
@@ -149,10 +169,9 @@ Stored as JSON in a TEXT column:
 - **Libraries:** Google Maps JS API with the `geometry` library only (`encodePath()`, spherical math).
 
 ### Core File Patches Required
-Three patches applied by the installer (`install.php::patch_core_files()`):
-1. `includes/application_core.php` — adds `require` for our field type class after `fieldtype_google_drive.php`
-2. `includes/classes/fields_types.php` — adds `'fieldtype_unitas_geometry'` after `'fieldtype_mind_map'` in the Maps group
-3. `includes/classes/model/entities_menu.php` (v1.5.1, reworked v1.5.2) — two one-line shims so Unitas map reports appear in Application Structure > Entities > Menu. Core has NO hook for that dropdown: `get_reports_choices()` is a hardcoded query list and `build_menu()` a `switch(true)` of `strstr` cases. Shim A goes before `get_reports_choices()` returns; shim B is the FIRST statement of `build_menu()` (anchored on the function signature, never inside the switch). Both call functions in `application_top.php`, so all logic stays in the plugin.
+As of v1.6.x the installer manages these core edits:
+1. `includes/classes/fields_types.php` — shim S1 (`UNITAS_EXT_SHIM:field_types`) registers **both** Unitas field types via `unitas_ext_core_field_types()`; shim S2 (`UNITAS_EXT_SHIM:update_items_fields`) hooks item saves via `unitas_ext_core_update_items_fields()`. Field type classes themselves load through the plugin's own `application_core.php`, which core auto-loads — the old v1.1.0 `require` patch in core `includes/application_core.php` is retired automatically on upgrade.
+2. `includes/classes/model/entities_menu.php` (v1.5.1, reworked v1.5.2) — two one-line shims so Unitas map reports appear in Application Structure > Entities > Menu. Core has NO hook for that dropdown: `get_reports_choices()` is a hardcoded query list and `build_menu()` a `switch(true)` of `strstr` cases. Shim A goes before `get_reports_choices()` returns; shim B is the FIRST statement of `build_menu()` (anchored on the function signature, never inside the switch). Both call functions in `application_top.php`, so all logic stays in the plugin.
    - Menu value prefixes: `unitasmap{id}` / `unitaspivotmap{id}`, deliberately free of the substrings core matches (`map_reports`, `pivot_map_reports`, `image_map`).
    - **Never trust the `$reports_id` core computes for our entries.** It comes from `str_replace(self::get_reports_types(), '', $reports_type)`, which only strips type names core knows — ours are absent, so the full value survives and casts to `0`. `unitas_ext_menu_build_item()` receives the raw `$reports_list` and parses ids itself.
    - The installer auto-migrates the older v1.5.1 case-based shim to this form.
@@ -179,6 +198,34 @@ The geometry type is selectable as the map field for Unitas Map Reports and Pivo
 - **Times:** `starttime` = actual Date/Time Closed (parse chain: numeric → strtotime → date_added → now); `endtime` = now + rolling window (5–120 min, default 15) on every response. Waze only guarantees removal at endtime, so delisted records clear within ~window + one polling cycle.
 - **Mapping:** JSON in `app_unitas_map_reports_config.waze_feed_config` (entity + field ids + closed/one-direction choice ids + reason→subtype map with labels captured at save time). Admin UI is a second portlet on the Waze Integration page; `ajax_feed_fields` (admin-only) loads per-entity field and choice selects.
 - **IMPORTANT:** CIFS `polyline` = space-separated lat/lon pairs — the feed uses the stored `points` array, NOT `encoded_polyline`. Polygon/circle records are skipped.
+
+## Feature: Google Key Lockdown & Location Field (v1.6.x)
+
+### Two-Key Model
+- **Browser key** (`unitas_google_keys::browser()`): `UNITAS_GOOGLE_BROWSER_KEY` constant → `app_unitas_map_reports_config.google_map_api_key`. Website-restricted; public by design; used by every map page.
+- **Server key** (`::server()`): `UNITAS_GOOGLE_SERVER_KEY` constant → `google_server_api_key` column. IP-restricted, Geocoding-only. **Never** rendered into HTML/JS, logged, exported, or put in error messages. UI field is write-only password, never prefilled. Only `unitas_geocoder` and the config Test Server Key call may use it.
+
+### Location Field (`fieldtype_unitas_location`)
+- Value: `{lat}\t{lng}\t{address}\t{status}` (plain-text address, 7dp coords) in a TEXT NOT NULL column. Statuses: autocomplete | geocoded | approximate | manual | not_found | error. Clients may only submit `autocomplete`/`manual` (`CLIENT_STATUSES`); everything else is server-assigned.
+- Config JSON keys: `source_field_id` (same-entity `fieldtype_input` — the only id reference; Porter must remap it), `enable_autocomplete`, `form_map_preview`, `map_width`, `map_height`, `zoom`.
+- Save hook (shim S2 → `process_record()`) re-geocodes whenever the source address no longer matches the stored value; the Re-geocode tool calls the **same** function so tool and hook can never disagree. Settled status + unchanged address = no lookup.
+- Pin drag: on forms writes the hidden input (`manual`); on record pages POSTs `unitas_ext/location/pin` (CSRF via `action=save`, checks visibility → update access → field access → field type → coords).
+- Map rendering follows the **geometry field methodology**: fully inline, synchronous, stateless per-render JS with unique per-render element ids (`unitas_loc_map_{uid}`), classic `google.maps.Map`/`Marker`. Rukovoditel renders record views TWICE (side panel + modal, modal earlier in DOM) — any binding by field id or DOM order fails intermittently.
+
+### Maps JS Loading (CRITICAL)
+- One shared classic loader: `unitas_google_loader::emit()` + `js/google/unitas_gmaps_loader.js`, sharing the geometry field's flags (`_unitasGeoApiLoading`/`_unitasGeoApiReady`/`_unitasGeoQueue`). Google's dynamic `importLibrary` bootstrap is **FORBIDDEN** as the page loader — it installs a half-empty `google.maps` stub that breaks every classic-namespace consumer.
+- `emit()` deliberately does NOT set core's `$is_google_map_script`.
+- `warnIfForeignKey()` console-warns when another module loaded Maps with a different key — the symptom of the legacy Extension "Google Autocomplete" smart input still being active. That module must be deactivated at cutover.
+
+### Address Autocomplete (Places API New)
+- Widget `js/google/unitas_address_autocomplete.js`: `AutocompleteSuggestion.fetchAutocompleteSuggestions` + session tokens + `toPlace().fetchFields()`. 3-char/300ms debounce, max 5, breadcrumb console logging, duplicate-id-safe attach (`querySelectorAll('[id="fields_N"]')` — modal forms duplicate ids). Dispatches `unitas:address-selected` / `unitas:address-edited` events the location widget listens for.
+- Standalone rules in `app_unitas_address_autocomplete_rules` (unique per `fields_id`) attach it to any plain text field; location fields with `enable_autocomplete` get it implicitly. Injection in `application_top.php` when browser key + field ids present.
+
+### Location Tools (admin)
+- **Migration:** preflight (blocks GeliosSoft, non-`[N]` address patterns, indexed columns) → convert (config rewrite dropping `api_key`, ALTER to TEXT NOT NULL, batched 500-row value rewrite, log to `app_unitas_location_migration_log`; gated on backup + key-test confirmations) → guidance to Re-geocode.
+- **Re-geocode:** 25-row AJAX batches via `process_record()`, optional retry of not_found/approximate.
+- **Location Health:** per-status triage (`field LIKE '%\t<status>'`), capped 200/desc.
+- **P12:** once no core Google map fields remain (`CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT`), core `items/google_map` returns 403.
 
 ## Feature: HEIC Converter
 
@@ -258,6 +305,15 @@ When calling `unitas_pivot_map_reports::` static methods from view templates, th
 
 ### Core File Patches After Updates
 After Rukovoditel core updates, the geometry field type patches in `application_core.php` and `fields_types.php` will be overwritten. Visit the install page to re-apply, or upgrades handle it automatically.
+
+### URLs Inside Inline Scripts
+NEVER wrap a URL in `htmlspecialchars()` when emitting it inside inline `<script>` text — entities are not decoded there, so `&callback=` becomes the literal `&amp;callback=` and the parameter is silently lost (this once blanked geometry, location, and autocomplete at the same time via the shared loader queue). Use `json_encode($url)`.
+
+### Migrations Under an Unchanged Version
+Gate schema changes on `PLUGIN_UNITAS_EXT_SCHEMA_VERSION` (integer), not only the semantic version — several dev iterations can ship under one version string, and version-equality gating silently skips new tables. Storage classes must degrade via `table_ready()` when their table does not exist yet.
+
+### Record Views Render Twice
+Rukovoditel record displays render output twice (info side panel + info modal; modal containers earlier in the DOM), and modal forms duplicate element ids. Widgets must use unique per-render element ids and inline synchronous JS (geometry pattern); autocomplete-style attachers must use `querySelectorAll` over all id matches, never `getElementById`.
 
 ### PHP OpCache
 After deploying PHP changes, restart PHP-FPM/Apache or call `opcache_reset()`.

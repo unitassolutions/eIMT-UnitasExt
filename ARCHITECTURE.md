@@ -177,6 +177,49 @@ Overrides:
 
 ---
 
+## Google Key Lockdown & Location Field (v1.6.x)
+
+### ADR-023: Two Keys, Two Trust Levels
+**Decision:** One website-restricted browser key (public by design, rendered into every map page) and one IP-restricted server key used only by `unitas_geocoder` and the config test. Resolution order for each: `config/server.php` constant (`UNITAS_GOOGLE_BROWSER_KEY` / `UNITAS_GOOGLE_SERVER_KEY`) → config table column. All key reads go through `unitas_google_keys`.
+**Rationale:** The core `fieldtype_google_map` needed one key for both browser display and server geocoding, so it could not be restricted either way. Splitting lets both restrictions actually be applied.
+**Rules:** The server key is never rendered into HTML/JS, never logged, never in error messages or exports; the UI field is write-only (`type="password"`, never prefilled) with an explicit clear checkbox.
+
+### ADR-024: Marker-Delimited Core Shims with Refuse-on-Ambiguity
+**Decision:** Core edits for field-type registration (S1) and the save hook (S2) are injected between `/* UNITAS_EXT_SHIM:{name} */` markers. The installer applies a shim only when its anchor occurs exactly once in the core file (`substr_count === 1`), otherwise it refuses and reports. Re-apply is idempotent (strip old marker block, re-insert). `shim_health()` powers a fixed admin banner after core updates. The v1.1.0-era patch style is auto-retired on upgrade.
+**Rationale:** Guessing at a moved anchor risks corrupting core; a loud refusal plus the repair runbook is strictly safer.
+**Rule:** Shim bodies are one-line calls into plugin functions guarded by `function_exists()` — all logic lives in the plugin.
+
+### ADR-025: Four-Part Value with a Server-Authoritative Status
+**Decision:** Location values are `lat<TAB>lng<TAB>address<TAB>status` with a plain-text address (the core legacy format is 3-part with a url-encoded address; only migration decodes). Clients may submit only `autocomplete` or `manual`; `geocoded`, `approximate`, `not_found`, and `error` are assigned exclusively by the server save hook / re-geocode tool, which share a single `process_record()` decision function so they can never disagree. A settled status with an unchanged address is never re-geocoded (cost + idempotency), unless explicitly retried by the tool.
+**Tradeoff:** Any external consumer reading raw values must be checked before cutover (open question Q1 in the plan).
+
+### ADR-026: Classic Maps JS Loading Only — Dynamic Import Bootstrap Forbidden
+**Decision:** All Unitas map consumers load the Maps API with a classic `<script src=…&callback=…>` tag through one shared loader that reuses the geometry field's in-flight flags (`_unitasGeoApiLoading` / `_unitasGeoApiReady` / `_unitasGeoQueue`). Google's dynamic `importLibrary` bootstrap is forbidden as the page-level loader.
+**Rationale:** The dynamic bootstrap installs a half-empty `google.maps` stub; every classic-namespace consumer on the page (geometry field, report renderers) then sees `google.maps` defined but `google.maps.Map` missing and breaks. Proven painfully in 1.6.1–1.6.6 debugging.
+
+### ADR-027: Inline, Synchronous, Stateless Per-Render Map Widgets
+**Decision:** The location field renders its maps exactly like the geometry field: fully inline JS emitted with the HTML, unique per-render element ids (`unitas_loc_map_{uid}`), no shared registry, no deferred binding by field id or DOM order.
+**Rationale:** Rukovoditel renders record views twice (info side panel + info modal, and the modal containers sit **earlier** in the DOM), so both first-match and last-match element heuristics fail intermittently. Per-render uniqueness is the only binding that survives duplicate rendering. This is the standing pattern for any future field-type widget.
+
+### ADR-028: `json_encode`, Never `htmlspecialchars`, for URLs in Inline Scripts
+**Decision:** Any URL emitted inside inline `<script>` text is emitted via `json_encode()`.
+**Rationale:** HTML entities are not decoded inside script text; `htmlspecialchars()` turns `&callback=` into the literal `&amp;callback=`, silently dropping the parameter. One such bug in the geometry field poisoned the shared loader queue and blanked three features at once.
+
+### ADR-029: Independent Integer Schema Version
+**Decision:** Migrations key on `PLUGIN_UNITAS_EXT_SCHEMA_VERSION` (integer, stored as `CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION`) in addition to the semantic plugin version.
+**Rationale:** During 1.6.x development several phases shipped under one semantic version; version-equality gating silently skipped new tables and fataled pages. Storage classes also degrade gracefully (`table_ready()`) when their table does not exist yet.
+
+### ADR-030: Migration as Config Rewrite + Column Alter + Batched Value Rewrite
+**Decision:** Converting a core Google map field flips `app_fields.type`, rewrites configuration (dropping `api_key`/`address_pattern`/GeliosSoft keys, resolving the `[N]` pattern to `source_field_id`), alters the entity column to TEXT NOT NULL, rewrites values in batches of 500 (legacy 3-part → 4-part `geocoded`, invalid → empty), and logs to `app_unitas_location_migration_log`. Preflight blocks GeliosSoft fields, non-`[N]` patterns, and indexed columns. Conversion is gated on backup + key-test confirmations.
+**Rationale:** Reversible-by-backup, observable, and cheap to re-run; re-geocoding is a separate explicitly driven step (25-row AJAX batches) so the convert step never makes network calls.
+
+### Known Issues — Location / Autocomplete
+- The Places (New) autocomplete widget replaces the Extension "Google Autocomplete" smart input; the legacy module must be **deactivated** at cutover — its Maps tag with the old key wins the single-load race and 403s Places calls. Admin pages and the loader (`warnIfForeignKey`) both warn when it is detected.
+- `unitas_google_loader::emit()` deliberately does not set core's `$is_google_map_script` flag: setting it would suppress core/Extension map emissions that still expect their own tag, and the shared-flag loader already prevents double loading on Unitas pages.
+- Pin drags on record pages update the value directly and are not written to Track Changes (open question Q4; revisit if audit trails require it).
+
+---
+
 ## General
 
 ### PHP Compatibility

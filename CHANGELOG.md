@@ -1,5 +1,66 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.6.7 (2026-09-11) — Google Maps Platform key lockdown
+
+Consolidated release for the 1.6.x arc (1.6.0–1.6.7 were development
+iterations on the dev instance; 1.6.7 is the release build). Replaces the
+core `fieldtype_google_map` field and the Extension Google Autocomplete smart
+input with Unitas-owned equivalents, so each instance can run a
+website-restricted browser key and an IP-restricted server key. See
+`unitas_ext/readme.md` for the key setup and cutover runbooks.
+
+### New Features
+- **Two-key Google configuration** — The Google Map page now stores a browser key (public, website-restricted) and a separate server key (Geocoding-only, IP-restricted). The server key field is write-only (`type="password"`, never prefilled), can be cleared explicitly, and may instead be supplied as `UNITAS_GOOGLE_SERVER_KEY` in `config/server.php` (takes precedence; UI shows source + last-4 hint). Both keys have one-click tests: the browser key test exercises Maps JS + Places (New) client-side, the server key test geocodes a known address server-side. The server key is never rendered into HTML or JavaScript, never logged, and never appears in error messages.
+- **Location (Google Map) field type** (`fieldtype_unitas_location`) — Replaces the core Google Map field. Configuration: same-entity address source field, autocomplete on/off, form map preview on/off, size, zoom. Value is stored as `lat<TAB>lng<TAB>address<TAB>status` (plain-text address) in a TEXT NOT NULL column. Statuses: `autocomplete`, `geocoded`, `approximate`, `manual`, `not_found`, `error`; clients may only submit `autocomplete`/`manual` — everything else is decided server-side.
+- **Server-side geocoding on save** — A core save hook re-geocodes a record whenever the address text no longer matches the stored value, so the server key does the authoritative lookup (partial matches and geometric centers marked `approximate`; failures throttled into the config error log without the key). The tool and the hook share one per-record decision function so they can never disagree.
+- **Draggable pin** — Item forms and record pages render a pin preview map; dragging the pin (with update access) writes a `manual` status either into the form value or through a new CSRF-protected pin endpoint that enforces record visibility, update access, field access, field type, and coordinate validation.
+- **Address autocomplete (Places API New)** — A Unitas-owned widget (`AutocompleteSuggestion` + session tokens + `Place.fetchFields`) attaches to location source fields and, via the new Address Autocomplete rules page, to any plain text field — replacing the deprecated-API Extension smart input. Debounced, keyboard-navigable, text-node-only dropdown; breadcrumb console logging for diagnosis; admin warnings when the legacy Extension module is still active.
+- **Shared classic Maps JS loader** — One loader (`unitas_gmaps_loader.js` + `unitas_google_loader::emit()`) loads the Maps API classically with the browser key and shares the geometry field's in-flight flags, so geometry, location, autocomplete, and reports never double-load or conflict. Foreign key detection warns when another module loaded Maps with a different key.
+- **Location Tools** (admin) — Migration tab: read-only preflight (pattern/GeliosSoft/index checks, row counts, placement) and one-click conversion of core Google Map fields (config rewrite, column ALTER to TEXT NOT NULL, batched value rewrite decoding the legacy url-encoded address, migration log) gated on backup + key-test confirmations. Re-geocode tab: batched driver (25 rows/request) with optional retry of `not_found`/`approximate`. Location Health tab: per-status triage listing with record links.
+- **Core endpoint block (P12)** — Once no core Google map fields remain, the core `items/google_map` endpoint returns 403, closing the key-bearing page.
+- **Marker-delimited core shims** — Field type registration (S1) and the save hook (S2) are injected between `UNITAS_EXT_SHIM` markers, applied only when the anchor occurs exactly once (otherwise the installer refuses rather than guessing), re-applied idempotently, and monitored by a shim health check with a fixed admin banner when a core update overwrites them. Legacy v1.1.0-style patches are retired automatically on upgrade.
+- **Independent schema version** — Migrations now key on an integer `CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION` (currently 2) in addition to the semantic version, so schema added under an unchanged plugin version still applies.
+- **Vendored marker clusterer** — Report views load a pinned, self-hosted `markerclusterer-2.5.3.min.js` instead of an unpinned unpkg tag (security checklist S-13).
+
+### Bug Fixes
+- **Geometry maps silently blank** — The geometry field emitted its Maps API URL through `htmlspecialchars()` inside an inline `<script>`, where HTML entities are not decoded; the literal `&amp;` swallowed the `callback` parameter and poisoned the shared loader queue (also silencing location maps and autocomplete). Both emissions now use `json_encode()`.
+- **Location map on record pages rendered once, then never again (Chrome)** — Rukovoditel renders the record view twice (side panel + modal container, the modal earlier in the DOM), so element-id and DOM-order binding both failed intermittently. The renderer was rewritten to the geometry field's proven methodology: fully inline, synchronous, stateless per-render JS with unique per-instance element ids and classic `google.maps.Map`/`Marker`.
+- **Autocomplete never fired with an empty console** — Silent give-up paths and first-match `getElementById` on duplicate-id modal forms. The widget now logs breadcrumbs at every stage, attaches to every matching element, and warns loudly when it gives up.
+- **Missing rules table fataled every page** — Migrations were gated only on the semantic version, which did not change between phases. Fixed by the schema version plus `table_ready()` graceful degradation.
+
+### Files Added
+| File | Purpose |
+|---|---|
+| `application_core.php` | Plugin bootstrap loaded by core on web/cron/REST: core hooks + field type classes |
+| `classes/core_hooks.php` | Shim entry points: field type registration + save hook (all guarded) |
+| `classes/google/unitas_google_keys.php` | Browser/server key resolver (constants override DB; server hint) |
+| `classes/google/unitas_geocoder.php` | Server-side Geocoding API client (TLS verified, throttled error log, memoized) |
+| `classes/google/unitas_google_loader.php` | Emits `window.UNITAS_GMAPS` config + loader script once per request |
+| `classes/location/unitas_location_value.php` | 4-part value parse/format/validate helper |
+| `classes/location/unitas_address_autocomplete_rules.php` | Rules storage + page-injection asset emitter |
+| `classes/location/unitas_location_migration.php` | Preflight + convert + batched value rewrite |
+| `classes/fieldstypes/fieldtype_unitas_location.php` | The location field type |
+| `js/google/unitas_gmaps_loader.js` | Classic Maps JS loader sharing geometry flags |
+| `js/google/unitas_address_autocomplete.js` | Places (New) autocomplete widget |
+| `js/vendor/markerclusterer-2.5.3.min.js` | Pinned self-hosted marker clusterer |
+| `css/unitas_autocomplete.css` / `css/unitas_location.css` | Widget styling |
+| `modules/address_autocomplete/` | Rules CRUD + field AJAX |
+| `modules/location/actions/pin.php` | Secure pin-drag endpoint |
+| `modules/location_tools/` | Migration / Re-geocode / Location Health tabs |
+| `PORTER_UNITAS_LOCATION_PLAN.md` | Handover plan for Ruko-Porter-Module support |
+
+### Files Changed
+| File | Change |
+|---|---|
+| `application_top.php` | Version 1.6.7 + schema version 2; pin endpoint in AJAX skip; P12 block; shim banner; autocomplete page injection |
+| `install.php` | v1.6.0 config columns, rules + migration log tables, S1/S2 shims, shim health, legacy patch retirement, core-gmap flag |
+| `classes/fieldstypes/fieldtype_unitas_geometry.php` | `json_encode` for API URLs; email output via listing summary; map config via shared helper |
+| `modules/map_configuration/` | Two-key screen, key tests, region codes, bias radius, status portlet |
+| `modules/map_reports/` + `modules/pivot_map_reports/` | Location field selectable as map field (Google renderer); browser key via resolver; vendored clusterer |
+| `menu.php` | Address Autocomplete + Location Tools menu entries |
+
+---
+
 ## v1.5.2 (2026-07-27)
 
 ### Bug Fixes
