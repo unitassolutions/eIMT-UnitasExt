@@ -1,4 +1,5 @@
 <?php
+require_once PLUGIN_UNITAS_EXT_PATH . '/classes/google/unitas_google_keys.php';
 
 require_once dirname(__DIR__, 3) . '/modules/map_configuration/helpers/map_config.php';
 $map_cfg = unitas_map_config::get();
@@ -20,7 +21,7 @@ $cfg = new fields_types_cfg($field_info['configuration']);
 
 /* ---- SAFE SCRIPT URL BUILDING (CRITICAL FIX) ---- */
 $google_maps_js = 'https://maps.googleapis.com/maps/api/js'
-    . '?key=' . urlencode($map_cfg['google_map_api_key'])
+    . '?key=' . urlencode(unitas_google_keys::browser())
     . '&v=weekly'
     . '&map_ids=' . urlencode($MAP_STYLE_LIGHT_ID . ',' . $MAP_STYLE_DARK_ID);
 
@@ -29,7 +30,7 @@ $google_maps_js = 'https://maps.googleapis.com/maps/api/js'
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
 <script src="<?php echo $google_maps_js; ?>"></script>
-<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+<script src="plugins/unitas_ext/js/vendor/markerclusterer-2.5.3.min.js"></script>
 <script src="js/geliossoft/geliossoft_objects.js?v=<?php echo PROJECT_VERSION; ?>"></script>
 
 <div id="map_rpeort_<?php echo $reports['id']; ?>"></div>

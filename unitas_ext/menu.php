@@ -36,6 +36,14 @@ if (unitas_ext_installer::is_installed()) {
                             'url'   => url_for('unitas_ext/map_configuration/index')
                         ),
                         array(
+                            'title' => 'Address Autocomplete',
+                            'url'   => url_for('unitas_ext/address_autocomplete/index')
+                        ),
+                        array(
+                            'title' => 'Location Tools',
+                            'url'   => url_for('unitas_ext/location_tools/index')
+                        ),
+                        array(
                             'title' => 'HEIC Converter',
                             'url'   => url_for('unitas_ext/heic_converter/index')
                         ),

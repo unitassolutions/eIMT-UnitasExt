@@ -11,7 +11,12 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.5.2');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.6.7');
+// Schema version: bump by 1 whenever a migration is added, independent of the
+// plugin version above, so migrations added under an unchanged plugin version
+// still run. (v1 = the 1.6.0 key-lockdown schema: config columns + the address
+// autocomplete rules table; v2 = the migration log table.)
+define('PLUGIN_UNITAS_EXT_SCHEMA_VERSION', 2);
 define('PLUGIN_UNITAS_EXT_PATH', __DIR__);
 
 // Load installer
@@ -25,7 +30,8 @@ $is_ajax_request = (
     (isset($_POST['is_modal']) && $_POST['is_modal'] == 1) ||
     (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/entity_buttons/ajax_get_buttons') ||
     (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/ajax_reverse_geocode') ||
-    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/public')
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/waze_integration/public') ||
+    (isset($_GET['module']) && $_GET['module'] == 'unitas_ext/location/pin')
 );
 
 // ── Installation Check ──────────────────────────────────────────────────────
@@ -52,6 +58,17 @@ if (!unitas_ext_installer::is_installed() && !$is_ajax_request) {
 // If installed but DB version is behind plugin version, run migrations silently.
 if (unitas_ext_installer::is_installed() && unitas_ext_installer::needs_upgrade() && !$is_ajax_request) {
     unitas_ext_installer::upgrade();
+}
+
+// ── Block the vulnerable core items/google_map endpoint (P12) ────────────────
+// Once no core Google map fields remain, core update_latlng / save_value_in
+// have no legitimate use and carry an unauthorized-write + stored-XSS path.
+// The presence flag is cached in app_configuration and refreshed by migration.
+if ($current_module === 'items/google_map'
+    && unitas_ext_installer::is_installed()
+    && !unitas_ext_installer::core_gmap_fields_present()) {
+    http_response_code(403);
+    exit();
 }
 
 // Load entity buttons class (tables are guaranteed to exist after install)
@@ -151,6 +168,25 @@ if (!function_exists('unitas_ext_menu_build_item')) {
 
 $unitas_inject_html = '';
 
+// Core integration health banner (plan section 6.6): if a Rukovoditel core
+// update silently removed one of our shims, geocoding stops on every save path.
+// For an emergency management system that failure must be loud, so show a
+// persistent fixed banner on ALL admin pages (admins only) until repaired.
+if (!$is_ajax_request
+    && isset($app_user['group_id']) && $app_user['group_id'] == 0
+    && unitas_ext_installer::is_installed()) {
+    $unitas_shim_health = unitas_ext_installer::shim_health();
+    if (empty($unitas_shim_health['all_ok'])) {
+        $unitas_install_url = url_for('unitas_ext/install/index');
+        $unitas_inject_html .= "\n<!-- Unitas Extension: core integration health banner -->\n"
+            . '<div class="alert alert-danger" style="position:fixed;top:0;left:0;right:0;z-index:11000;margin:0;border-radius:0;text-align:center;">'
+            . '<i class="fa fa-exclamation-triangle"></i> <b>UNITAS Extension core integration is incomplete.</b> '
+            . 'Address geocoding is disabled. '
+            . '<a href="' . htmlspecialchars($unitas_install_url) . '">Open UNITAS Extension &gt; Install to repair.</a>'
+            . '</div>' . "\n";
+    }
+}
+
 // Entity Buttons: JS + CSS on listing pages only
 if (!$is_ajax_request) {
     $current_module = $_GET['module'] ?? '';
@@ -185,6 +221,22 @@ if (isset($app_user['id']) && $app_user['id'] > 0) {
     $unitas_inject_html .= "\n<!-- Unitas Extension: HEIC Converter -->\n" .
         '<link rel="stylesheet" href="plugins/unitas_ext/css/heic_converter.css">' . "\n" .
         '<script src="plugins/unitas_ext/js/heic/heic_converter.js"></script>' . "\n";
+}
+
+// Address Autocomplete: inject the shared Maps loader, the field id list, and
+// the widget on non-AJAX pages when there is at least one field to attach to
+// and a browser key is configured. The widget uses a delegated focusin
+// listener, so AJAX-loaded modal forms are covered by the parent page's script.
+if (!$is_ajax_request && unitas_ext_installer::is_installed()) {
+    require_once PLUGIN_UNITAS_EXT_PATH . '/classes/location/unitas_address_autocomplete_rules.php';
+    require_once PLUGIN_UNITAS_EXT_PATH . '/classes/google/unitas_google_loader.php';
+
+    $unitas_ac_field_ids = unitas_address_autocomplete_rules::field_ids();
+    if ($unitas_ac_field_ids && unitas_google_keys::browser() !== '') {
+        $unitas_inject_html .= "\n<!-- Unitas Extension: Address Autocomplete -->\n"
+            . unitas_google_loader::emit()
+            . unitas_address_autocomplete_rules::emit_assets($unitas_ac_field_ids) . "\n";
+    }
 }
 
 // Lightbox Embed Mode: Hide sidebar, header, footer when loaded inside a lightbox iframe.

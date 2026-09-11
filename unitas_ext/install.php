@@ -22,7 +22,7 @@ class unitas_ext_installer
     }
 
     /**
-     * Get the currently installed DB schema version.
+     * Get the currently installed plugin version.
      */
     static function get_db_version()
     {
@@ -30,6 +30,27 @@ class unitas_ext_installer
             return CFG_PLUGIN_UNITAS_EXT_DB_VERSION;
         }
         return '0.0.0';
+    }
+
+    /**
+     * Schema version the code expects (integer, bumped per migration batch).
+     * Independent of the plugin's semantic version so that several commits
+     * sharing one plugin version each still trigger their own migrations.
+     */
+    static function schema_version()
+    {
+        return defined('PLUGIN_UNITAS_EXT_SCHEMA_VERSION') ? (int)PLUGIN_UNITAS_EXT_SCHEMA_VERSION : 0;
+    }
+
+    /**
+     * Schema version currently recorded in the database.
+     */
+    static function get_db_schema_version()
+    {
+        if (defined('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION')) {
+            return (int)CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION;
+        }
+        return 0;
     }
 
     /**
@@ -49,26 +70,32 @@ class unitas_ext_installer
         // Mark as installed
         self::set_config('CFG_PLUGIN_UNITAS_EXT_INSTALLED', '1');
         self::set_config('CFG_PLUGIN_UNITAS_EXT_DB_VERSION', PLUGIN_UNITAS_EXT_VERSION);
+        self::set_config('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION', (string)self::schema_version());
 
         return true;
     }
 
     /**
-     * Run migrations for version upgrades.
+     * Run migrations for version and/or schema upgrades. run_migrations() is
+     * fully idempotent, so re-running it is safe.
      */
     static function upgrade()
     {
         self::run_migrations();
         self::patch_core_files();
         self::set_config('CFG_PLUGIN_UNITAS_EXT_DB_VERSION', PLUGIN_UNITAS_EXT_VERSION);
+        self::set_config('CFG_PLUGIN_UNITAS_EXT_SCHEMA_VERSION', (string)self::schema_version());
     }
 
     /**
-     * Check if upgrade is needed (plugin version > DB version).
+     * Upgrade is needed when the plugin version advanced OR the schema version
+     * advanced. The schema check catches new migrations added under an
+     * unchanged plugin version.
      */
     static function needs_upgrade()
     {
-        return version_compare(PLUGIN_UNITAS_EXT_VERSION, self::get_db_version(), '>');
+        return version_compare(PLUGIN_UNITAS_EXT_VERSION, self::get_db_version(), '>')
+            || (self::schema_version() > self::get_db_schema_version());
     }
 
     /**
@@ -221,6 +248,55 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
         if (!self::column_exists('app_unitas_pivot_map_reports', 'layout')) {
             db_query("ALTER TABLE app_unitas_pivot_map_reports ADD COLUMN layout varchar(16) NOT NULL DEFAULT 'classic' AFTER map_type");
         }
+
+        // v1.6.0: Google key lockdown — separate server key, autocomplete
+        // settings, and last-geocode-error tracking on the shared config row.
+        if (!self::column_exists('app_unitas_map_reports_config', 'google_server_api_key')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN google_server_api_key varchar(255) NOT NULL DEFAULT '' AFTER google_map_api_key");
+        }
+        if (!self::column_exists('app_unitas_map_reports_config', 'autocomplete_region_codes')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN autocomplete_region_codes varchar(64) NOT NULL DEFAULT 'us' AFTER waze_feed_config");
+        }
+        if (!self::column_exists('app_unitas_map_reports_config', 'autocomplete_bias_radius_m')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN autocomplete_bias_radius_m int(11) NOT NULL DEFAULT 50000 AFTER autocomplete_region_codes");
+        }
+        if (!self::column_exists('app_unitas_map_reports_config', 'geocode_last_status')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN geocode_last_status varchar(32) NOT NULL DEFAULT '' AFTER autocomplete_bias_radius_m");
+        }
+        if (!self::column_exists('app_unitas_map_reports_config', 'geocode_last_error')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN geocode_last_error varchar(255) NOT NULL DEFAULT '' AFTER geocode_last_status");
+        }
+        if (!self::column_exists('app_unitas_map_reports_config', 'geocode_last_error_at')) {
+            db_query("ALTER TABLE app_unitas_map_reports_config ADD COLUMN geocode_last_error_at datetime NULL DEFAULT NULL AFTER geocode_last_error");
+        }
+
+        // v1.6.0: standalone address autocomplete rules (attach Places autocomplete
+        // to a plain text field). Safe/idempotent via IF NOT EXISTS.
+        db_query("
+CREATE TABLE IF NOT EXISTS `app_unitas_address_autocomplete_rules` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `entities_id` int(10) UNSIGNED NOT NULL,
+  `fields_id` int(10) UNSIGNED NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `notes` text NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fields_id` (`fields_id`),
+  KEY `idx_entities_id` (`entities_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // v1.6.7 (schema 2): log of core Google map field conversions (plan 8.2).
+        db_query("
+CREATE TABLE IF NOT EXISTS `app_unitas_location_migration_log` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `fields_id` int(10) UNSIGNED NOT NULL,
+  `entities_id` int(10) UNSIGNED NOT NULL,
+  `converted_at` datetime NOT NULL,
+  `converted_by` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `rows_rewritten` int(11) NOT NULL DEFAULT 0,
+  `notes` text NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_fields_id` (`fields_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 
     /**
@@ -249,6 +325,35 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
         }
     }
 
+    /**
+     * Whether any core Google map fields still exist (P12). Cached in
+     * app_configuration so the check runs once, not on every request; the
+     * cached constant is loaded by core at bootstrap on subsequent requests.
+     * The migration tool and location tools page call refresh_core_gmap_flag()
+     * to update it.
+     */
+    static function core_gmap_fields_present()
+    {
+        if (defined('CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT')) {
+            return CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT === '1';
+        }
+        // Not cached yet: compute now, store for next request, use this value now.
+        return self::refresh_core_gmap_flag();
+    }
+
+    /**
+     * Recompute and store the core-Google-map-fields presence flag.
+     * @return bool present
+     */
+    static function refresh_core_gmap_flag()
+    {
+        $q = db_query("select count(*) as n from app_fields where type in ('fieldtype_google_map','fieldtype_google_map_directions','fieldtype_google_map_nested')");
+        $r = db_fetch_array($q);
+        $present = ($r && (int)$r['n'] > 0);
+        self::set_config('CFG_UNITAS_CORE_GMAP_FIELDS_PRESENT', $present ? '1' : '0');
+        return $present;
+    }
+
     // ── Core File Patching ──────────────────────────────────────────────────
 
     /**
@@ -256,85 +361,100 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
      */
     static function core_patches_applied()
     {
-        $core_file = 'includes/application_core.php';
-        $types_file = 'includes/classes/fields_types.php';
-        $menu_file = 'includes/classes/model/entities_menu.php';
-
-        if (!file_exists($core_file) || !file_exists($types_file) || !file_exists($menu_file)) return false;
-
-        $core_content = file_get_contents($core_file);
-        $types_content = file_get_contents($types_file);
-        $menu_content = file_get_contents($menu_file);
-
-        $has_require = (strpos($core_content, 'fieldtype_unitas_geometry') !== false);
-        $has_choice = (strpos($types_content, 'fieldtype_unitas_geometry') !== false);
-        $has_menu = (strpos($menu_content, 'unitas_ext_menu_build_item($reports_list') !== false);
-
-        return ($has_require && $has_choice && $has_menu);
+        $h = self::shim_health();
+        return $h['all_ok'];
     }
 
     /**
-     * Patch core Rukovoditel files to register the custom field type.
-     * Two minimal changes:
-     *   1. application_core.php: add require for our field type class
-     *   2. fields_types.php: add our type to the Maps dropdown group
-     * 
-     * Safe to re-run. Checks if patches already exist before applying.
-     * Must be re-applied after Rukovoditel core updates.
+     * Per-shim health check (plan section 6.6). Reports which core integration
+     * shims are currently present, so the install/config screens and the admin
+     * banner can flag a core update that silently removed one.
+     *
+     * @return array{s1:bool, s2:bool, menu:bool, all_ok:bool}
+     *   s1   = field type registration shim in fields_types::get_choices()
+     *   s2   = save hook shim in fields_types::update_items_fields()
+     *   menu = entities_menu.php map report menu shims
+     */
+    static function shim_health()
+    {
+        $types_file = 'includes/classes/fields_types.php';
+        $menu_file  = 'includes/classes/model/entities_menu.php';
+
+        $s1 = $s2 = $menu = false;
+
+        if (file_exists($types_file)) {
+            $types_content = file_get_contents($types_file);
+            $s1 = (strpos($types_content, 'UNITAS_EXT_SHIM:field_types') !== false);
+            $s2 = (strpos($types_content, 'UNITAS_EXT_SHIM:update_items_fields') !== false);
+        }
+        if (file_exists($menu_file)) {
+            $menu_content = file_get_contents($menu_file);
+            $menu = (strpos($menu_content, 'unitas_ext_menu_build_item($reports_list') !== false);
+        }
+
+        return array(
+            's1'     => $s1,
+            's2'     => $s2,
+            'menu'   => $menu,
+            'all_ok' => ($s1 && $s2 && $menu),
+        );
+    }
+
+    /**
+     * Patch core Rukovoditel files with the plugin integration shims.
+     *
+     * Two generic, marker-delimited shims (plan section 6) replace the old
+     * per-type edits:
+     *   S1  fields_types::get_choices()        -> unitas_ext_core_field_types()
+     *   S2  fields_types::update_items_fields() -> unitas_ext_core_update_items_fields()
+     * A third edit (unchanged) lets Unitas map reports appear in the entity
+     * menu configuration.
+     *
+     * Each shim is idempotent, refuses to patch unless its anchor occurs
+     * exactly once, and calls a plugin function so all logic stays in the
+     * plugin. Legacy pre-1.6.0 edits are retired here too.
+     *
+     * Safe to re-run. Must be re-applied after Rukovoditel core updates.
      */
     static function patch_core_files()
     {
         $results = array('patched' => array(), 'skipped' => array(), 'errors' => array());
 
-        // Patch 1: application_core.php — add require for our field type
-        $core_file = 'includes/application_core.php';
-        if (file_exists($core_file)) {
-            $content = file_get_contents($core_file);
-            if (strpos($content, 'fieldtype_unitas_geometry') === false) {
-                // Find the last fieldtype require line and add ours after it
-                $needle = "require('includes/classes/fieldstypes/fieldtype_google_drive.php');";
-                if (strpos($content, $needle) !== false) {
-                    $patch = $needle . "\n    require('plugins/unitas_ext/classes/fieldstypes/fieldtype_unitas_geometry.php');";
-                    $patched = str_replace($needle, $patch, $content);
-                    if (file_put_contents($core_file, $patched) !== false) {
-                        $results['patched'][] = 'application_core.php';
-                    } else {
-                        $results['errors'][] = 'application_core.php (write failed — check file permissions)';
-                    }
-                } else {
-                    $results['errors'][] = 'application_core.php (anchor line not found — manual patch needed)';
-                }
-            } else {
-                $results['skipped'][] = 'application_core.php (already patched)';
-            }
-        } else {
-            $results['errors'][] = 'application_core.php (file not found)';
-        }
-
-        // Patch 2: fields_types.php — add to Maps group in get_choices()
         $types_file = 'includes/classes/fields_types.php';
-        if (file_exists($types_file)) {
-            $content = file_get_contents($types_file);
-            if (strpos($content, 'fieldtype_unitas_geometry') === false) {
-                // Find the mind_map entry in the Maps group and add ours after it
-                $needle = "'fieldtype_mind_map',";
-                if (strpos($content, $needle) !== false) {
-                    $patch = "'fieldtype_mind_map',\n            'fieldtype_unitas_geometry',";
-                    $patched = str_replace($needle, $patch, $content);
-                    if (file_put_contents($types_file, $patched) !== false) {
-                        $results['patched'][] = 'fields_types.php';
-                    } else {
-                        $results['errors'][] = 'fields_types.php (write failed — check file permissions)';
-                    }
-                } else {
-                    $results['errors'][] = 'fields_types.php (anchor line not found — manual patch needed)';
-                }
-            } else {
-                $results['skipped'][] = 'fields_types.php (already patched)';
-            }
-        } else {
-            $results['errors'][] = 'fields_types.php (file not found)';
-        }
+
+        // Shim S1: register Unitas field types in the Maps group. Inserted
+        // immediately BEFORE the unique foreach in get_choices(). %ANCHOR% in
+        // the template is replaced by the anchor itself.
+        self::install_shim(
+            $types_file,
+            'S1',
+            'UNITAS_EXT_SHIM:field_types',
+            'foreach ($fieldtypes as $group => $fields)',
+            "// UNITAS_EXT_SHIM:field_types (managed by plugins/unitas_ext/install.php, do not edit)\n"
+                . "        if (function_exists('unitas_ext_core_field_types')) unitas_ext_core_field_types(\$fieldtypes);\n\n"
+                . "        %ANCHOR%",
+            $results
+        );
+
+        // Shim S2: run Unitas post-save updates on every save path. Inserted
+        // immediately AFTER the unique core google_map save call in
+        // update_items_fields().
+        self::install_shim(
+            $types_file,
+            'S2',
+            'UNITAS_EXT_SHIM:update_items_fields',
+            'fieldtype_google_map::update_items_fields($current_entity_id, $item_id, $item_info);',
+            "%ANCHOR%\n"
+                . "        // UNITAS_EXT_SHIM:update_items_fields (managed by plugins/unitas_ext/install.php, do not edit)\n"
+                . "        if (function_exists('unitas_ext_core_update_items_fields')) unitas_ext_core_update_items_fields(\$current_entity_id, \$item_id, \$item_info);",
+            $results
+        );
+
+        // Retire the pre-1.6.0 per-type edits (plan section 6.5). The plugin
+        // application_core.php now loads the field type classes and shim S1
+        // registers them, so the old edits are removed. Their absence is
+        // recorded as already-removed, not an error.
+        self::retire_legacy_patches($results);
 
         // Patch 3: entities_menu.php — let Unitas map reports be placed in the
         // main menu (Application Structure > Entities > Menu). Core has no hook
@@ -400,5 +520,103 @@ CREATE TABLE IF NOT EXISTS `app_unitas_pivot_map_reports_entities` (
         }
 
         return $results;
+    }
+
+    /**
+     * Idempotently insert a marker-delimited shim into a core file relative to a
+     * unique anchor (plan section 6.1). Refuses to patch — and changes nothing —
+     * unless the anchor occurs exactly once, so a core rewrite that duplicated
+     * or removed the anchor is reported instead of mis-patched. Safe to re-run.
+     *
+     * @param string $file     core file path
+     * @param string $label    short shim id for messages (S1/S2)
+     * @param string $marker   unique substring proving the shim is present
+     * @param string $anchor   unique anchor text to insert relative to
+     * @param string $template replacement text; %ANCHOR% is replaced by $anchor
+     * @param array  $results  results accumulator, by reference
+     */
+    private static function install_shim($file, $label, $marker, $anchor, $template, &$results)
+    {
+        if (!file_exists($file)) {
+            $results['errors'][] = "{$file} ({$label}: file not found)";
+            return;
+        }
+
+        $content = file_get_contents($file);
+
+        if (strpos($content, $marker) !== false) {
+            $results['skipped'][] = "{$file} ({$label}: already applied)";
+            return;
+        }
+
+        $count = substr_count($content, $anchor);
+        if ($count !== 1) {
+            $results['errors'][] = "{$file} ({$label}: anchor found {$count} times, expected exactly 1 — not patched)";
+            return;
+        }
+
+        // %ANCHOR% carries the anchor into the replacement. str_replace does not
+        // re-scan inserted text, so a template that repeats the anchor is safe.
+        $replacement = str_replace('%ANCHOR%', $anchor, $template);
+        $patched = str_replace($anchor, $replacement, $content);
+
+        if (file_put_contents($file, $patched) !== false) {
+            $results['patched'][] = "{$file} ({$label})";
+        } else {
+            $results['errors'][] = "{$file} ({$label}: write failed — check file permissions)";
+        }
+    }
+
+    /**
+     * Remove the pre-1.6.0 core edits (plan section 6.5):
+     *   - the geometry require injected into core includes/application_core.php
+     *   - the geometry entry injected into BOTH get_types_excluded_in_email()
+     *     and get_choices() in fields_types.php (the old str_replace that also
+     *     wrongly excluded geometry from notification emails)
+     *
+     * Matches only the inserted lines. Not finding them is recorded as
+     * already-removed, not an error. Idempotent.
+     */
+    private static function retire_legacy_patches(&$results)
+    {
+        // 1. core application_core.php geometry require line
+        $core_file = 'includes/application_core.php';
+        if (file_exists($core_file)) {
+            $content = file_get_contents($core_file);
+            $new = preg_replace(
+                "/\n[ \t]*require\('plugins\/unitas_ext\/classes\/fieldstypes\/fieldtype_unitas_geometry\.php'\);/",
+                '',
+                $content
+            );
+            if ($new !== null && $new !== $content) {
+                if (file_put_contents($core_file, $new) !== false) {
+                    $results['patched'][] = 'application_core.php (legacy require removed)';
+                } else {
+                    $results['errors'][] = 'application_core.php (legacy require removal write failed)';
+                }
+            } else {
+                $results['skipped'][] = 'application_core.php (no legacy require)';
+            }
+        }
+
+        // 2. fields_types.php geometry array entries (both functions)
+        $types_file = 'includes/classes/fields_types.php';
+        if (file_exists($types_file)) {
+            $content = file_get_contents($types_file);
+            $new = preg_replace(
+                "/\n[ \t]*'fieldtype_unitas_geometry',/",
+                '',
+                $content
+            );
+            if ($new !== null && $new !== $content) {
+                if (file_put_contents($types_file, $new) !== false) {
+                    $results['patched'][] = 'fields_types.php (legacy geometry entries removed)';
+                } else {
+                    $results['errors'][] = 'fields_types.php (legacy geometry removal write failed)';
+                }
+            } else {
+                $results['skipped'][] = 'fields_types.php (no legacy geometry entries)';
+            }
+        }
     }
 }

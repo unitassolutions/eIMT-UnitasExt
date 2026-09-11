@@ -1,0 +1,22 @@
+/* UNITAS Extension - location field styles. Reuses Rukovoditel alert classes
+   for status messages; only layout/spacing here. See plan section 7.10. */
+
+.unitas-loc-map {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    min-height: 200px;
+}
+
+.unitas-loc-status {
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.unitas-loc-status:empty {
+    display: none;
+}
+
+.unitas-loc-status .fa {
+    margin-right: 4px;
+}
