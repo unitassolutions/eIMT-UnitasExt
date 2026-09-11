@@ -1,5 +1,29 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.6.8 (2026-09-11) — Pivot map v2 filter card fixes
+
+Cosmetic hotfixes to the Pivot Map Report v2 (modern) layout. No schema
+changes (schema version stays 2); no core shims touched.
+
+### Fixes
+- **Empty filter bar removed.** `pivot_map_reports/views/view.php` now only
+  emits the floating `.unitas-pmv2-filters` card when
+  `render_entity_filters_panel()` returns content. Reports with no configured
+  filter fields were rendering an empty, padded card as a stray bar floating
+  over the top of the map.
+- **Selected filter value legibility.** `css/pivot_map_v2.css` darkens the
+  select2 selected value(s) inside the filter card — single value
+  (`.select2-selection__rendered`, previously the select2 default `#444`) and
+  multi-select pills (`.select2-selection__choice`) — to the v2 card ink
+  (`#26303b`). The placeholder (`.select2-selection__placeholder`, `#999`) is
+  deliberately left medium gray so an unset filter still reads as a hint. The
+  select2 control keeps a white background in both light and dark mode, so the
+  darker text stays readable in both.
+
+### Notes
+- The v2 CSS cache-buster is keyed to `PLUGIN_UNITAS_EXT_VERSION`, so the
+  version bump to 1.6.8 is what forces browsers to pick up the restyled card.
+
 ## v1.6.7 (2026-09-11) — Google Maps Platform key lockdown
 
 Consolidated release for the 1.6.x arc (1.6.0–1.6.7 were development
