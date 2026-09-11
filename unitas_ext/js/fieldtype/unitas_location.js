@@ -45,23 +45,46 @@
         return { lat: Number(lat), lng: Number(lng) };
     }
 
-    // Always bind to the LAST element carrying an id: a closed-but-hidden
-    // modal can leave stale duplicates of fields_{id} / unitas_loc_map_{id}
-    // in the page, and getElementById returns the first (stale) one — the
-    // newest DOM (appended later) is the live view.
+    // Fallback lookup for configs without a uid (stale cached PHP output):
+    // the LAST element carrying an id. Unreliable when modal containers sit
+    // earlier in the DOM than page content, which is why uid binding exists.
     function lastById(id) {
         var els = document.querySelectorAll('[id="' + id + '"]');
         return els.length ? els[els.length - 1] : null;
     }
 
+    // Element of THIS render instance: the same field can be rendered several
+    // times on one page (info side panel + info modal + stacked edit modal),
+    // so ids collide; each PHP render stamps its own elements with a unique
+    // data-unitas-uid that the init config carries.
+    function pickUid(uid, cls) {
+        if (!uid) return null;
+        var els = document.querySelectorAll('[data-unitas-uid="' + uid + '"]');
+        for (var i = els.length - 1; i >= 0; i--) {
+            if (els[i].classList && els[i].classList.contains(cls)) return els[i];
+        }
+        return null;
+    }
+
     function Field(cfg) {
         this.cfg = cfg;
+        this.mapEl = pickUid(cfg.uid, 'unitas-loc-map') || lastById('unitas_loc_map_' + cfg.fieldId);
+        this.statusEl = pickUid(cfg.uid, 'unitas-loc-status') || lastById('unitas_loc_status_' + cfg.fieldId);
+
+        // Form inputs are resolved inside the SAME form as this instance's
+        // elements, so a stale hidden modal or a duplicate id elsewhere on the
+        // page can never be picked up.
+        var root = null;
+        if (this.mapEl && this.mapEl.closest) root = this.mapEl.closest('form');
+        if (!root && this.statusEl && this.statusEl.closest) root = this.statusEl.closest('form');
+        function inRoot(id) { return root ? root.querySelector('[id="' + id + '"]') : null; }
+
         // Item-page context (cfg.path set) never uses a hidden input — manual
         // pins must POST to the endpoint, not write into a stale form input.
-        this.hidden = cfg.path ? null : lastById('fields_' + cfg.fieldId);
-        this.source = cfg.sourceFieldId ? lastById('fields_' + cfg.sourceFieldId) : null;
-        this.statusEl = lastById('unitas_loc_status_' + cfg.fieldId);
-        this.mapEl = lastById('unitas_loc_map_' + cfg.fieldId);
+        this.hidden = cfg.path ? null : (inRoot('fields_' + cfg.fieldId) || lastById('fields_' + cfg.fieldId));
+        this.source = cfg.sourceFieldId
+            ? (inRoot('fields_' + cfg.sourceFieldId) || lastById('fields_' + cfg.sourceFieldId))
+            : null;
         this.map = null;
         this.marker = null;
         this.value = cfg.value || { lat: null, lng: null, address: '', status: '' };
@@ -253,10 +276,13 @@
     function init(cfg) {
         try {
             if (!cfg) return;
-            // Anchor the guard to the actual DOM element (per-instance), and to
-            // the LAST element carrying the id: stale hidden-modal duplicates
-            // earlier in the DOM must not block a fresh view from initializing.
-            var anchor = lastById('unitas_loc_map_' + cfg.fieldId)
+            // Anchor the once-guard to THIS instance's own element (by uid),
+            // falling back to last-by-id only for uid-less configs. Every
+            // rendered instance initializes independently, however many copies
+            // of the field the page holds.
+            var anchor = pickUid(cfg.uid, 'unitas-loc-map')
+                      || pickUid(cfg.uid, 'unitas-loc-status')
+                      || lastById('unitas_loc_map_' + cfg.fieldId)
                       || lastById('fields_' + cfg.fieldId)
                       || lastById('unitas_loc_status_' + cfg.fieldId);
             if (!anchor) return;

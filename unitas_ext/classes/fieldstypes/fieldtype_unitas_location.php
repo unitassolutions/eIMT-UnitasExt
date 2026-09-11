@@ -117,16 +117,23 @@ class fieldtype_unitas_location
         if (!strstr($w, '%') && !strstr($w, 'px')) $w .= 'px';
         if (!strstr($h, '%') && !strstr($h, 'px')) $h .= 'px';
 
+        // Unique per-render instance id: the same field can be rendered several
+        // times on one page (info side panel + info modal + a stacked edit
+        // modal), and modal containers can sit EARLIER in the DOM than page
+        // content, so neither "first" nor "last" element with a given id is
+        // reliable. The JS binds to the elements carrying THIS uid.
+        $uid = 'u' . substr(md5(uniqid((string)$fid, true)), 0, 10);
+
         // Hidden input carries the stored value. No 'required' class: coordinates
         // cannot be guaranteed at submit time even when the admin marks required.
         $html = self::css_once();
         $html .= '<input type="hidden" name="fields[' . $fid . ']" id="fields_' . $fid . '" value="'
               . htmlspecialchars($raw, ENT_QUOTES) . '">';
 
-        $html .= '<div id="unitas_loc_status_' . $fid . '" class="unitas-loc-status" aria-live="polite"></div>';
+        $html .= '<div id="unitas_loc_status_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-status" aria-live="polite"></div>';
 
         if ($preview) {
-            $html .= '<div id="unitas_loc_map_' . $fid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
+            $html .= '<div id="unitas_loc_map_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
         } elseif ($api_key === '') {
             $html .= '<em class="text-muted">Map preview unavailable (no browser key).</em>';
         } else {
@@ -144,6 +151,7 @@ class fieldtype_unitas_location
 
         $init = json_encode(array(
             'fieldId'       => $fid,
+            'uid'           => $uid,
             'sourceFieldId' => $src_id,
             'value'         => $parsed,
             'canEdit'       => true,
@@ -318,8 +326,13 @@ class fieldtype_unitas_location
             $can_edit = users::has_access('update');
         }
 
+        // Same per-instance uid scheme as render(): the info panel, info modal
+        // and stacked modals can each render this output on one page.
+        $uid = 'u' . substr(md5(uniqid((string)$fid, true)), 0, 10);
+
         $init = json_encode(array(
             'fieldId'       => $fid,
+            'uid'           => $uid,
             'value'         => $p,
             'canEdit'       => $can_edit,
             'preview'       => true,
@@ -331,7 +344,7 @@ class fieldtype_unitas_location
             'strings'       => self::status_strings(),
         ), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
-        $html .= '<div id="unitas_loc_map_' . $fid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
+        $html .= '<div id="unitas_loc_map_' . $fid . '" data-unitas-uid="' . $uid . '" class="unitas-loc-map" style="width:' . $w . ';height:' . $h . ';"></div>';
         $html .= unitas_google_loader::emit();
         $html .= self::init_script($init);
 
