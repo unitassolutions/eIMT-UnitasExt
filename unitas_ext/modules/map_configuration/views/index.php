@@ -154,6 +154,18 @@ $post_url = url_for('unitas_ext/map_configuration/index');
     </div>
     <div class="portlet-body">
 
+        <?php
+        require_once PLUGIN_UNITAS_EXT_PATH . '/classes/location/unitas_address_autocomplete_rules.php';
+        if (unitas_address_autocomplete_rules::legacy_google_autocomplete_active()): ?>
+            <div class="alert alert-warning">
+                <i class="fa fa-exclamation-triangle"></i>
+                <b>The legacy Extension &quot;Google Autocomplete&quot; smart input module is still active.</b>
+                It loads Google Maps on every page with its own API key, so Unitas maps, autocomplete,
+                and the browser key test all run under <em>that</em> key instead of the browser key above.
+                Deactivate it under <b>Extension &gt; Modules &gt; Smart Input</b>, then re-run the tests.
+            </div>
+        <?php endif; ?>
+
         <h4 class="bold" style="margin-top:0;">Core Integration</h4>
         <?php if ($health['all_ok']): ?>
             <p><span class="label label-success"><i class="fa fa-check"></i> Healthy</span>

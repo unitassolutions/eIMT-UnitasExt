@@ -92,6 +92,27 @@ class unitas_address_autocomplete_rules
     }
 
     /**
+     * Whether the legacy Extension "Google Autocomplete" smart input module is
+     * still active. While it is, it loads Maps JS with its OWN key on every
+     * page, and the shared loader (correctly refusing to double-load) reuses
+     * that copy - so Places (New) requests run under the wrong key and are
+     * blocked. Surfaced as an admin warning until it is deactivated
+     * (cutover runbook step 6).
+     */
+    public static function legacy_google_autocomplete_active()
+    {
+        static $active = null;
+        if ($active !== null) return $active;
+
+        $active = false;
+        if (function_exists('is_ext_installed') && is_ext_installed()) {
+            $q = db_query("select id from app_ext_modules where type = 'smart_input' and module = 'google_autocomplete' and is_active = 1 limit 1");
+            if (db_fetch_array($q)) $active = true;
+        }
+        return $active;
+    }
+
+    /**
      * Emit the browser assets that activate autocomplete on the given field
      * ids: a script that appends the ids to window.UNITAS_AUTOCOMPLETE_FIELDS
      * and (once per request) the widget script. Idempotent and safe to call

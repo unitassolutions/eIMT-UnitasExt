@@ -37,6 +37,16 @@ $location_bound = unitas_address_autocomplete_rules::location_bound_field_ids();
     <div class="portlet-body">
         <p class="text-muted">Attach Google Places (New) address suggestions to a plain text field. Requires a browser key configured under Google Map.</p>
 
+        <?php if (unitas_address_autocomplete_rules::legacy_google_autocomplete_active()): ?>
+            <div class="alert alert-warning">
+                <i class="fa fa-exclamation-triangle"></i>
+                <b>The legacy Extension &quot;Google Autocomplete&quot; smart input module is still active.</b>
+                It loads Google Maps with its own API key on every page, which blocks the Unitas autocomplete
+                from using the configured browser key. Deactivate it under
+                <b>Extension &gt; Modules &gt; Smart Input</b> before testing these rules.
+            </div>
+        <?php endif; ?>
+
         <table class="table table-striped table-bordered">
             <thead>
                 <tr><th>Entity</th><th>Field</th><th>Active</th><th>Notes</th><th style="width:140px;">Actions</th></tr>

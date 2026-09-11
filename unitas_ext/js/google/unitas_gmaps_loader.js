@@ -29,10 +29,36 @@
 
     var cfg = window.UNITAS_GMAPS || {};
     var libPromises = {};
+    var warnedForeignKey = false;
 
     /** Fully loaded classic namespace? */
     function mapsReady() {
         return !!(window.google && window.google.maps && window.google.maps.Map);
+    }
+
+    /**
+     * When Maps JS was loaded by another component (a core field, or the
+     * legacy Extension Google Autocomplete smart input) we reuse it rather
+     * than load a second copy - but then every request runs under THAT
+     * component's API key. If it differs from the configured Unitas browser
+     * key, say so loudly: this is the number-one cause of "blocked" Places
+     * errors during cutover.
+     */
+    function warnIfForeignKey() {
+        if (warnedForeignKey || !cfg.browserKey) return;
+        var tag = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+        if (!tag) return;
+        var m = /[?&]key=([^&]+)/.exec(tag.src || '');
+        if (m && decodeURIComponent(m[1]) !== cfg.browserKey) {
+            warnedForeignKey = true;
+            try {
+                console.warn('[unitas-gmaps] Google Maps was already loaded by another component with a DIFFERENT API key (...' +
+                    decodeURIComponent(m[1]).slice(-6) + ' instead of the configured ...' + cfg.browserKey.slice(-6) +
+                    '). All Maps and Places requests on this page use that key. If the legacy Extension ' +
+                    '"Google Autocomplete" smart input module is still active, deactivate it (Extension > Modules) ' +
+                    'so the Unitas browser key is used.');
+            } catch (e) {}
+        }
     }
 
     /** Import extra libraries on top of a loaded API (memoized). */
@@ -124,6 +150,8 @@
      */
     function load(libraries) {
         libraries = (libraries && libraries.length) ? libraries : [];
+
+        warnIfForeignKey();
 
         var p;
         if (mapsReady()) {
