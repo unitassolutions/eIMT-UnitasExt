@@ -45,12 +45,23 @@
         return { lat: Number(lat), lng: Number(lng) };
     }
 
+    // Always bind to the LAST element carrying an id: a closed-but-hidden
+    // modal can leave stale duplicates of fields_{id} / unitas_loc_map_{id}
+    // in the page, and getElementById returns the first (stale) one — the
+    // newest DOM (appended later) is the live view.
+    function lastById(id) {
+        var els = document.querySelectorAll('[id="' + id + '"]');
+        return els.length ? els[els.length - 1] : null;
+    }
+
     function Field(cfg) {
         this.cfg = cfg;
-        this.hidden = document.getElementById('fields_' + cfg.fieldId);
-        this.source = cfg.sourceFieldId ? document.getElementById('fields_' + cfg.sourceFieldId) : null;
-        this.statusEl = document.getElementById('unitas_loc_status_' + cfg.fieldId);
-        this.mapEl = document.getElementById('unitas_loc_map_' + cfg.fieldId);
+        // Item-page context (cfg.path set) never uses a hidden input — manual
+        // pins must POST to the endpoint, not write into a stale form input.
+        this.hidden = cfg.path ? null : lastById('fields_' + cfg.fieldId);
+        this.source = cfg.sourceFieldId ? lastById('fields_' + cfg.sourceFieldId) : null;
+        this.statusEl = lastById('unitas_loc_status_' + cfg.fieldId);
+        this.mapEl = lastById('unitas_loc_map_' + cfg.fieldId);
         this.map = null;
         this.marker = null;
         this.value = cfg.value || { lat: null, lng: null, address: '', status: '' };
@@ -242,12 +253,12 @@
     function init(cfg) {
         try {
             if (!cfg) return;
-            // Anchor the guard to the actual DOM element, not a page-level id
-            // cache, so a fresh modal DOM re-initializes (and a re-run on the
-            // same DOM does not double-init).
-            var anchor = document.getElementById('unitas_loc_map_' + cfg.fieldId)
-                      || document.getElementById('fields_' + cfg.fieldId)
-                      || document.getElementById('unitas_loc_status_' + cfg.fieldId);
+            // Anchor the guard to the actual DOM element (per-instance), and to
+            // the LAST element carrying the id: stale hidden-modal duplicates
+            // earlier in the DOM must not block a fresh view from initializing.
+            var anchor = lastById('unitas_loc_map_' + cfg.fieldId)
+                      || lastById('fields_' + cfg.fieldId)
+                      || lastById('unitas_loc_status_' + cfg.fieldId);
             if (!anchor) return;
             if (anchor.getAttribute('data-unitas-loc-init') === '1') return;
             anchor.setAttribute('data-unitas-loc-init', '1');

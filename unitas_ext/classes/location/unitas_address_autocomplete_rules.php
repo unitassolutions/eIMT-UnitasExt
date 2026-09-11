@@ -138,6 +138,7 @@ class unitas_address_autocomplete_rules
         if (!$script_emitted) {
             $script_emitted = true;
             $v = defined('PLUGIN_UNITAS_EXT_VERSION') ? PLUGIN_UNITAS_EXT_VERSION : '1.6.0';
+            $html .= '<link rel="stylesheet" href="plugins/unitas_ext/css/unitas_autocomplete.css?v=' . rawurlencode($v) . '">';
             $html .= '<script src="plugins/unitas_ext/js/google/unitas_address_autocomplete.js?v=' . rawurlencode($v) . '"></script>';
         }
 

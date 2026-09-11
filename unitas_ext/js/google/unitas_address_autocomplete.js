@@ -64,12 +64,14 @@
 
     Controller.prototype.buildList = function () {
         var el = document.createElement('div');
-        el.className = 'izo-autocomplete-items';
+        // Self-contained styling (css/unitas_autocomplete.css) — no dependency
+        // on core izoAutocomplete CSS being present, and a z-index above any
+        // Rukovoditel/Bootstrap modal so the list is never hidden behind one.
+        el.className = 'unitas-ac-list';
         el.setAttribute('role', 'listbox');
         el.id = 'unitas-ac-list-' + (fieldIdOf(this.input) || Math.random().toString(36).slice(2));
         el.style.position = 'fixed';
-        el.style.marginLeft = '0';
-        el.style.zIndex = '11000';
+        el.style.zIndex = '100000';
         el.style.display = 'none';
         document.body.appendChild(el);
 
@@ -173,9 +175,15 @@
         suggestions.forEach(function (s, i) {
             var pred = s.placePrediction;
             var row = document.createElement('div');
+            row.className = 'unitas-ac-item';
             row.setAttribute('role', 'option');
             row.id = self.listEl.id + '-opt-' + i;
-            row.textContent = self.predictionText(pred); // textContent only: no HTML injection
+            var pin = document.createElement('i');
+            pin.className = 'fa fa-map-marker unitas-ac-pin';
+            pin.setAttribute('aria-hidden', 'true');
+            row.appendChild(pin);
+            // suggestion text via a text node only: no HTML injection possible
+            row.appendChild(document.createTextNode(self.predictionText(pred)));
             row.addEventListener('mousedown', function (e) {
                 e.preventDefault(); // keep focus so blur does not pre-empt the pick
                 self.choose(i);
@@ -186,6 +194,10 @@
         this.reposition();
         this.listEl.style.display = 'block';
         this.open = true;
+        if (!this._loggedOpen) {
+            this._loggedOpen = true;
+            info('dropdown open at ' + this.listEl.style.left + ',' + this.listEl.style.top + ' w=' + this.listEl.style.width);
+        }
         this.input.setAttribute('aria-expanded', 'true');
         window.addEventListener('scroll', this.reposition, true);
         window.addEventListener('resize', this.reposition);
@@ -201,7 +213,7 @@
     Controller.prototype.highlight = function (index) {
         var rows = this.listEl.children;
         for (var i = 0; i < rows.length; i++) {
-            rows[i].classList.toggle('izo-autocomplete-active', i === index);
+            rows[i].classList.toggle('unitas-ac-active', i === index);
         }
         this.activeIndex = index;
         if (index >= 0 && rows[index]) {
