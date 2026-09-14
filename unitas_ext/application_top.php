@@ -11,7 +11,7 @@
  */
 
 // Plugin constants
-define('PLUGIN_UNITAS_EXT_VERSION', '1.6.8');
+define('PLUGIN_UNITAS_EXT_VERSION', '1.6.9');
 // Schema version: bump by 1 whenever a migration is added, independent of the
 // plugin version above, so migrations added under an unchanged plugin version
 // still run. (v1 = the 1.6.0 key-lockdown schema: config columns + the address

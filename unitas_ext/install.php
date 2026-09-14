@@ -88,6 +88,37 @@ class unitas_ext_installer
     }
 
     /**
+     * Re-apply the core integration shims without a version/schema change.
+     *
+     * A Rukovoditel core update overwrites the patched core files and silently
+     * removes our shims, but leaves the plugin and DB versions untouched — so
+     * needs_upgrade() stays false and neither install() nor upgrade() re-run.
+     * This is the repair path the admin banner and install page point at.
+     *
+     * Returns the patch_core_files() results (patched / skipped / errors) so the
+     * caller can surface exactly what happened, including a core version whose
+     * anchors no longer match. It also resets OpCache when available, so the
+     * freshly re-written core files take effect on the next request rather than
+     * waiting for a manual PHP-FPM restart.
+     *
+     * @return array{patched:string[], skipped:string[], errors:string[]}
+     */
+    static function repair()
+    {
+        $results = self::patch_core_files();
+
+        // Keep the cached core-Google-map-fields flag in step with reality.
+        self::refresh_core_gmap_flag();
+
+        // Make the rewritten core files live immediately where the host allows it.
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+
+        return $results;
+    }
+
+    /**
      * Upgrade is needed when the plugin version advanced OR the schema version
      * advanced. The schema check catches new migrations added under an
      * unchanged plugin version.
