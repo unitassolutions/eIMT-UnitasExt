@@ -138,7 +138,7 @@ After **any** Rukovoditel core update:
 
 1. Deploy the core update.
 2. Log in as admin — a fixed banner appears if the Unitas core shims were overwritten.
-3. Open UNITAS Extension > Install and re-run the installer (idempotent: re-applies the field type shims, the save hook, and the menu shims).
-4. If the installer reports an anchor was not found exactly once, **stop** — the anchor in `install.php` must be updated against the new core source before re-running. Do not hand-edit core.
+3. Open UNITAS Extension > Install. When a shim is missing the page shows a red **Repair Core Integration** button and a per-shim status list — click it (idempotent: re-applies the field type shim, the save hook, and the menu shims, refreshes the core-Google-map-fields flag, and resets OpCache). The button link carries the CSRF token; a hand-typed `action=` URL will be rejected.
+4. If the repair reports an anchor was not found exactly once, **stop** — the anchor in `install.php` must be updated against the new core source before re-running. Do not hand-edit core.
 5. Save a test record with a known address and confirm its location status is `geocoded`.
 

@@ -1,5 +1,45 @@
 # CHANGELOG — eIMT-UnitasExt
 
+## v1.6.9 (2026-09-13) — Repairable core integration
+
+Adds a version-independent repair path for the core integration shims. No
+schema changes (schema version stays 2).
+
+### Background
+After a Rukovoditel core update overwrites the patched core files, the shims
+(field-type registration, geocode-on-save, and the entity menu integration)
+are silently removed. The admin health banner correctly detects this and asks
+the admin to open **UNITAS Extension > Install to repair** — but the Install
+page only offered an action when the plugin/DB version differed. With the
+version unchanged, `needs_upgrade()` stayed false and the page said "Installed
+& Up to Date / No action needed", leaving the admin with nothing to click. A
+hand-typed `action=upgrade` URL also fails, because Rukovoditel enforces a CSRF
+token that only `url_for()`-generated links carry.
+
+### Fixes
+- **Repair Core Integration button.** `modules/install/views/index.php` now
+  shows a dedicated "Core Integration Repair Needed" state and a repair button
+  whenever `shim_health()` reports a missing shim, independent of the version
+  check. The button link is built with `url_for()`, so it carries the CSRF
+  token the manual URL lacked.
+- **New `action=repair` handler.** `modules/install/actions/index.php` calls
+  the new `unitas_ext_installer::repair()`, which re-applies the shims via
+  `patch_core_files()` without touching the version/schema, refreshes the
+  cached core-Google-map-fields flag, and resets PHP OpCache when available so
+  the rewritten core files take effect on the next request. The result
+  (patched / already-applied / anchor errors) is surfaced as an alert instead
+  of failing silently.
+- **Accurate shim status panel.** The Install page's stale "Core File Patches"
+  panel (which still described the pre-1.6 geometry-only patch) is replaced by
+  a "Core Integration Shims" panel showing real per-shim status for S1 (field
+  types), S2 (geocode-on-save), and the entity menu shim, read from
+  `shim_health()`.
+
+### Notes
+- Because the plugin version advanced to 1.6.9, an instance still on DB version
+  1.6.8 will self-heal on the next admin page load via the existing auto-upgrade
+  path — no button click required after deploy.
+
 ## v1.6.8 (2026-09-11) — Pivot map v2 filter card fixes
 
 Cosmetic hotfixes to the Pivot Map Report v2 (modern) layout. No schema

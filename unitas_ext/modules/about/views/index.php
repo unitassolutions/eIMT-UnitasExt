@@ -92,6 +92,11 @@
             </div>
             <div class="panel-body">
                 <ul>
+                    <li><strong>Repair core integration button:</strong> When a Rukovoditel core update wipes the integration shims, the Install page now shows a one-click <em>Repair Core Integration</em> button and per-shim status. Previously the admin banner asked you to repair, but the Install page offered no action when the plugin version was unchanged.</li>
+                    <li><strong>Clear repair feedback:</strong> Repair reports exactly which shims were re-applied — or which anchor could not be found on this Rukovoditel version — instead of failing silently, and resets PHP OpCache so the fix takes effect immediately.</li>
+                </ul>
+                <p style="margin-top:12px"><strong>Previously in v1.6.8 — Pivot map v2 filter card fixes</strong></p>
+                <ul>
                     <li><strong>Cleaner modern pivot map filters:</strong> Reports with no configured filter fields no longer show an empty filter bar floating over the top of the map.</li>
                     <li><strong>Readable filter selections:</strong> The chosen value in a modern pivot map filter now renders in dark ink instead of a washed-out gray, while the "Select some options" placeholder stays a subtle hint.</li>
                 </ul>

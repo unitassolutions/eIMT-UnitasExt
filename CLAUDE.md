@@ -6,7 +6,7 @@
 
 **Repo:** `https://github.com/unitassolutions/eIMT-UnitasExt`  
 **Plugin directory:** `plugins/unitas_ext/` inside a Rukovoditel installation  
-**Current version:** 1.6.8 (schema version 2)  
+**Current version:** 1.6.9 (schema version 2)  
 **Rukovoditel compatibility:** 3.5+ (tested on 3.6.4, 3.7)
 
 ### Deployment Instances
